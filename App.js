@@ -1,4 +1,4 @@
-// NutriTrack AI — Cal AI Inspired Native iOS Application
+// NutriTrack AI — Cal AI Inspired Native iOS & PWA Application
 // Pure white background, almost-black typography, thick black circular calorie meter, solid black scan action.
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -11,7 +11,8 @@ import {
   StyleSheet
 } from 'react-native';
 
-import { StorageService, getTodayDateString } from './src/services/storageService';
+import { StorageService } from './src/services/storageService';
+import { getLocalDateString, formatDateHuman } from './src/services/dateService';
 import { computeDailyTotals } from './src/services/nutritionCalculator';
 
 // Navigation & Modals
@@ -19,6 +20,7 @@ import BottomNav from './src/components/BottomNav';
 import ScanModal from './src/components/ScanModal';
 import QuickLogModal from './src/components/QuickLogModal';
 import FoodDatabaseModal from './src/components/FoodDatabaseModal';
+import OfflineBanner from './src/components/OfflineBanner';
 
 // 4 Primary Dedicated Screens
 import DashboardScreen from './src/screens/DashboardScreen';
@@ -35,14 +37,20 @@ export default function App() {
   // Active navigation tab: 'home' | 'diary' | 'insights' | 'profile'
   const [activeTab, setActiveTab] = useState('home');
 
-  // Currently selected date for tracking & diary
-  const [selectedDate, setSelectedDate] = useState(getTodayDateString(0));
+  // Today's immutable local calendar date
+  const todayDateStr = getLocalDateString(0);
+
+  // Active date for the Diary screen (user can select yesterday, etc.)
+  const [diaryDate, setDiaryDate] = useState(todayDateStr);
+
+  // Target date for the currently open logging modal
+  const [targetLoggingDate, setTargetLoggingDate] = useState(todayDateStr);
+  const [targetMealType, setTargetMealType] = useState('lunch');
 
   // Modal visibility states
   const [showScan, setShowScan] = useState(false);
   const [showQuickLog, setShowQuickLog] = useState(false);
   const [showFoodDb, setShowFoodDb] = useState(false);
-  const [targetMealType, setTargetMealType] = useState('lunch');
 
   // Load persisted app state on launch
   useEffect(() => {
@@ -61,7 +69,7 @@ export default function App() {
     loadInitialData();
   }, []);
 
-  // Persist state changes
+  // Persist state changes to storage
   const persistState = useCallback(async (newState) => {
     setAppState(newState);
     await StorageService.saveAppState(newState);
@@ -72,83 +80,117 @@ export default function App() {
     await StorageService.saveAiConfig(newConfig);
   }, []);
 
-  // Active day log data
-  const currentDayLog = useMemo(() => {
+  // Today's log strictly for Home Dashboard
+  const todayDayLog = useMemo(() => {
     if (!appState || !appState.logs) {
       return { waterMl: 0, meals: { breakfast: [], lunch: [], dinner: [], snacks: [] } };
     }
     return (
-      appState.logs[selectedDate] || {
+      appState.logs[todayDateStr] || {
         waterMl: 0,
         meals: { breakfast: [], lunch: [], dinner: [], snacks: [] }
       }
     );
-  }, [appState, selectedDate]);
+  }, [appState, todayDateStr]);
 
-  // Daily nutrition totals
-  const dailyTotals = useMemo(() => {
-    return computeDailyTotals(currentDayLog);
-  }, [currentDayLog]);
+  const todayDailyTotals = useMemo(() => {
+    return computeDailyTotals(todayDayLog);
+  }, [todayDayLog]);
 
-  // Add items to a specific meal (from AI photo scan, natural language log, or database)
-  const handleAddItemsToMeal = (mealType, newItems) => {
-    if (!appState || !newItems || newItems.length === 0) return;
-
-    const existingMealItems = (currentDayLog.meals && currentDayLog.meals[mealType]) || [];
-    const updatedMealItems = [...existingMealItems, ...newItems];
-
-    const updatedState = {
-      ...appState,
-      logs: {
-        ...appState.logs,
-        [selectedDate]: {
-          ...currentDayLog,
-          meals: {
-            ...currentDayLog.meals,
-            [mealType]: updatedMealItems
-          }
-        }
-      }
-    };
-    persistState(updatedState);
-  };
-
-  // Delete an item from a meal
-  const handleDeleteMealItem = (mealType, itemIndex) => {
-    if (!appState) return;
-    const existing = (currentDayLog.meals && currentDayLog.meals[mealType]) || [];
-    const updated = existing.filter((_, idx) => idx !== itemIndex);
-
-    const updatedState = {
-      ...appState,
-      logs: {
-        ...appState.logs,
-        [selectedDate]: {
-          ...currentDayLog,
-          meals: {
-            ...currentDayLog.meals,
-            [mealType]: updated
-          }
-        }
-      }
-    };
-    persistState(updatedState);
-  };
-
-  // Modal open helpers
-  const handleOpenScan = (meal = 'lunch') => {
+  // Modal open helpers with explicit target date
+  const handleOpenScan = (meal = 'lunch', forDate) => {
     setTargetMealType(meal);
+    setTargetLoggingDate(forDate || (activeTab === 'diary' ? diaryDate : todayDateStr));
     setShowScan(true);
   };
 
-  const handleOpenQuickLog = (meal = 'breakfast') => {
+  const handleOpenQuickLog = (meal = 'breakfast', forDate) => {
     setTargetMealType(meal);
+    setTargetLoggingDate(forDate || (activeTab === 'diary' ? diaryDate : todayDateStr));
     setShowQuickLog(true);
   };
 
-  const handleOpenFoodDb = (meal = 'lunch') => {
+  const handleOpenFoodDb = (meal = 'lunch', forDate) => {
     setTargetMealType(meal);
+    setTargetLoggingDate(forDate || (activeTab === 'diary' ? diaryDate : todayDateStr));
     setShowFoodDb(true);
+  };
+
+  // Add items to a specific meal with strict date stamping and persistence
+  const handleAddItemsToMeal = (mealType, newItems, overrideDate) => {
+    if (!appState || !newItems || newItems.length === 0) return;
+
+    const resolvedDate = overrideDate || targetLoggingDate || (activeTab === 'diary' ? diaryDate : todayDateStr);
+
+    const stampedItems = newItems.map((item, index) => ({
+      id: item.id || `food_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 5)}`,
+      name: item.name || 'Food item',
+      portion: item.portion || `${item.grams || 100}g`,
+      grams: Number(item.grams) || 100,
+      calories: Math.round(Number(item.calories) || 0),
+      protein: Math.round((Number(item.protein) || 0) * 10) / 10,
+      carbs: Math.round((Number(item.carbs) || 0) * 10) / 10,
+      fat: Math.round((Number(item.fat) || 0) * 10) / 10,
+      fiber: Math.round((Number(item.fiber) || 0) * 10) / 10,
+      sugar: Math.round((Number(item.sugar) || 0) * 10) / 10,
+      saturatedFat: Math.round((Number(item.saturatedFat) || 0) * 10) / 10,
+      mealCategory: mealType,
+      diaryDate: resolvedDate,
+      createdAt: item.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      icon: item.icon || '🍽️'
+    }));
+
+    const existingDayLog = (appState.logs && appState.logs[resolvedDate]) || {
+      waterMl: 0,
+      meals: { breakfast: [], lunch: [], dinner: [], snacks: [] }
+    };
+    const existingMeals = existingDayLog.meals || { breakfast: [], lunch: [], dinner: [], snacks: [] };
+    const currentMealList = existingMeals[mealType] || [];
+
+    const updatedMealList = [...currentMealList, ...stampedItems];
+
+    const updatedState = {
+      ...appState,
+      logs: {
+        ...appState.logs,
+        [resolvedDate]: {
+          ...existingDayLog,
+          meals: {
+            ...existingMeals,
+            [mealType]: updatedMealList
+          }
+        }
+      }
+    };
+    persistState(updatedState);
+  };
+
+  // Delete an item from a specific meal on a specific date
+  const handleDeleteMealItem = (mealType, itemIndex, targetDate) => {
+    if (!appState) return;
+    const resolvedDate = targetDate || diaryDate || todayDateStr;
+
+    const existingDayLog = appState.logs && appState.logs[resolvedDate];
+    if (!existingDayLog || !existingDayLog.meals) return;
+
+    const currentMealList = existingDayLog.meals[mealType] || [];
+    const updatedMealList = currentMealList.filter((_, idx) => idx !== itemIndex);
+
+    const updatedState = {
+      ...appState,
+      logs: {
+        ...appState.logs,
+        [resolvedDate]: {
+          ...existingDayLog,
+          meals: {
+            ...existingDayLog.meals,
+            [mealType]: updatedMealList
+          }
+        }
+      }
+    };
+    persistState(updatedState);
   };
 
   // Weight, Measurement & Body Composition Handlers
@@ -178,15 +220,9 @@ export default function App() {
     if (!appState) return;
     const existing = appState.weightLogs || [];
     const updated = existing.filter((w) => w.id !== entryId);
-    let newProfile = appState.userProfile;
-    if (updated.length > 0) {
-      const latest = updated[updated.length - 1];
-      newProfile = { ...newProfile, weightKg: latest.weightKg };
-    }
     persistState({
       ...appState,
-      weightLogs: updated,
-      userProfile: newProfile
+      weightLogs: updated
     });
   };
 
@@ -239,7 +275,7 @@ export default function App() {
 
   // Onboarding & Lifecycle Handlers
   const handleCompleteOnboarding = (profileData, targets) => {
-    const today = getTodayDateString(0);
+    const today = getLocalDateString(0);
     const updatedProfile = {
       ...appState.userProfile,
       ...profileData,
@@ -280,6 +316,8 @@ export default function App() {
   const handleResetApp = async () => {
     const fresh = await StorageService.resetToFreshState();
     setAppState(fresh);
+    setDiaryDate(getLocalDateString(0));
+    setTargetLoggingDate(getLocalDateString(0));
     setActiveTab('home');
   };
 
@@ -305,7 +343,7 @@ export default function App() {
     );
   }
 
-  // First-Time User Onboarding Flow: shown when onboardingCompleted is false
+  // First-Time User Onboarding Flow
   if (!appState.onboardingCompleted) {
     return (
       <OnboardingScreen
@@ -320,31 +358,35 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <OfflineBanner />
 
       {/* Screen Router */}
       <View style={styles.mainContainer}>
         {activeTab === 'home' && (
           <DashboardScreen
-            dayLog={currentDayLog}
+            dayLog={todayDayLog}
             userProfile={profile}
-            dailyTotals={dailyTotals}
+            dailyTotals={todayDailyTotals}
             logs={appState.logs}
-            onOpenScan={() => handleOpenScan('lunch')}
-            onOpenQuickLog={() => handleOpenQuickLog('breakfast')}
-            onOpenFoodDb={() => handleOpenFoodDb('lunch')}
-            onNavigateToDiary={() => setActiveTab('diary')}
+            onOpenScan={() => handleOpenScan('lunch', todayDateStr)}
+            onOpenQuickLog={() => handleOpenQuickLog('breakfast', todayDateStr)}
+            onOpenFoodDb={() => handleOpenFoodDb('lunch', todayDateStr)}
+            onNavigateToDiary={() => {
+              setDiaryDate(todayDateStr);
+              setActiveTab('diary');
+            }}
           />
         )}
 
         {activeTab === 'diary' && (
           <DiaryScreen
             appState={appState}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-            onOpenScanForMeal={(m) => handleOpenScan(m)}
-            onOpenQuickLogForMeal={(m) => handleOpenQuickLog(m)}
-            onOpenFoodDbForMeal={(m) => handleOpenFoodDb(m)}
-            onDeleteMealItem={handleDeleteMealItem}
+            selectedDate={diaryDate}
+            onSelectDate={setDiaryDate}
+            onOpenScanForMeal={(m, d) => handleOpenScan(m, d || diaryDate)}
+            onOpenQuickLogForMeal={(m, d) => handleOpenQuickLog(m, d || diaryDate)}
+            onOpenFoodDbForMeal={(m, d) => handleOpenFoodDb(m, d || diaryDate)}
+            onDeleteMealItem={(m, idx, d) => handleDeleteMealItem(m, idx, d || diaryDate)}
           />
         )}
 
@@ -375,8 +417,14 @@ export default function App() {
       {/* Cal AI iOS Bottom Navigation Bar */}
       <BottomNav
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
-        onOpenScan={() => handleOpenScan('lunch')}
+        onSelectTab={(tab) => {
+          if (tab === 'diary') {
+            // Keep user's active diary date or initialize to today if unset
+            setDiaryDate((prev) => prev || todayDateStr);
+          }
+          setActiveTab(tab);
+        }}
+        onOpenScan={() => handleOpenScan('lunch', activeTab === 'diary' ? diaryDate : todayDateStr)}
       />
 
       {/* AI Food Scanner Modal (Camera & Gallery) */}
@@ -385,6 +433,7 @@ export default function App() {
         onClose={() => setShowScan(false)}
         onAddMealItems={handleAddItemsToMeal}
         defaultMealType={targetMealType}
+        targetDate={targetLoggingDate}
         aiConfig={aiConfig}
       />
 
@@ -394,6 +443,7 @@ export default function App() {
         onClose={() => setShowQuickLog(false)}
         onAddMealItems={handleAddItemsToMeal}
         defaultMealType={targetMealType}
+        targetDate={targetLoggingDate}
         aiConfig={aiConfig}
       />
 
@@ -403,6 +453,7 @@ export default function App() {
         onClose={() => setShowFoodDb(false)}
         onAddFoodItem={handleAddItemsToMeal}
         defaultMealType={targetMealType}
+        targetDate={targetLoggingDate}
         customFoods={appState.customFoods || []}
       />
     </SafeAreaView>
@@ -421,13 +472,12 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   loadingLabel: {
-    marginTop: 14,
+    marginTop: 12,
     fontSize: 14,
     fontWeight: '600',
     color: '#858585'
   },
   mainContainer: {
-    flex: 1,
-    backgroundColor: '#FFFFFF'
+    flex: 1
   }
 });

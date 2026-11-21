@@ -15,6 +15,7 @@ import {
 import * as Haptics from 'expo-haptics';
 
 import { analyzeMealText } from '../services/aiService';
+import { formatDateHuman } from '../services/dateService';
 import { CrossIcon, TrashIcon } from './Icons';
 
 const POPULAR_MEALS = [
@@ -32,7 +33,8 @@ export default function QuickLogModal({
   onClose,
   onAddMealItems,
   defaultMealType = 'breakfast',
-  aiConfig
+  aiConfig,
+  targetDate
 }) {
   const [query, setQuery] = useState('');
   const [selectedMealType, setSelectedMealType] = useState(defaultMealType);
@@ -123,7 +125,7 @@ export default function QuickLogModal({
     } catch (e) {}
 
     if (onAddMealItems) {
-      onAddMealItems(selectedMealType, editableItems);
+      onAddMealItems(selectedMealType, editableItems, targetDate);
     }
 
     setTimeout(() => {
@@ -161,6 +163,15 @@ export default function QuickLogModal({
         </View>
 
         <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Target Date Pill */}
+          {targetDate ? (
+            <View style={styles.dateBadge}>
+              <Text style={styles.dateBadgeText}>
+                LOGGING FOR: {formatDateHuman(targetDate).toUpperCase()}
+              </Text>
+            </View>
+          ) : null}
+
           {/* Target Meal Selector */}
           <Text style={styles.sectionLabel}>TARGET MEAL</Text>
           <View style={styles.mealSelectorRow}>
@@ -368,6 +379,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 16
+  },
+  dateBadge: {
+    backgroundColor: '#F0F0F0',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#EAEAEA'
+  },
+  dateBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#111111',
+    letterSpacing: 0.5
   },
   sectionLabel: {
     fontSize: 10,

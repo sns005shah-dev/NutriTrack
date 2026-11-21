@@ -12,12 +12,14 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
-  StyleSheet
+  StyleSheet,
+  Platform
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 
 import { analyzeFoodImage } from '../services/aiService';
+import { formatDateHuman } from '../services/dateService';
 import {
   CameraIcon,
   ScanReticleIcon,
@@ -30,7 +32,8 @@ export default function ScanModal({
   onClose,
   onAddMealItems,
   defaultMealType = 'lunch',
-  aiConfig
+  aiConfig,
+  targetDate
 }) {
   const [imageUri, setImageUri] = useState(null);
   const [selectedMealType, setSelectedMealType] = useState(defaultMealType);
@@ -62,6 +65,38 @@ export default function ScanModal({
     setErrorMsg('');
     setAnalysisResult(null);
     setEditableItems([]);
+
+    // Web & PWA Camera / Gallery Fallback
+    if (Platform.OS === 'web') {
+      try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        if (useCamera) {
+          input.setAttribute('capture', 'environment');
+        }
+        input.onchange = (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = reader.result;
+            setImageUri(dataUrl);
+            const b64 = typeof dataUrl === 'string' ? dataUrl.split(',')[1] : '';
+            const mime = file.type || 'image/jpeg';
+            runVisionAnalysis(b64, mime);
+          };
+          reader.onerror = () => {
+            setErrorMsg('Failed to read selected image.');
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      } catch (err) {
+        setErrorMsg('Web image selection failed: ' + (err.message || 'unknown error'));
+      }
+      return;
+    }
 
     let result;
     if (useCamera) {
@@ -178,7 +213,7 @@ export default function ScanModal({
     } catch (e) {}
 
     if (onAddMealItems) {
-      onAddMealItems(selectedMealType, editableItems);
+      onAddMealItems(selectedMealType, editableItems, targetDate);
     }
 
     setTimeout(() => {
@@ -217,6 +252,15 @@ export default function ScanModal({
         </View>
 
         <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Target Date Pill */}
+          {targetDate ? (
+            <View style={styles.dateBadge}>
+              <Text style={styles.dateBadgeText}>
+                LOGGING FOR: {formatDateHuman(targetDate).toUpperCase()}
+              </Text>
+            </View>
+          ) : null}
+
           {/* Target Meal Selector */}
           <Text style={styles.sectionLabel}>TARGET MEAL</Text>
           <View style={styles.mealSelectorRow}>
@@ -493,6 +537,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 16
+  },
+  dateBadge: {
+    backgroundColor: '#F0F0F0',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#EAEAEA'
+  },
+  dateBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#111111',
+    letterSpacing: 0.5
   },
   sectionLabel: {
     fontSize: 10,

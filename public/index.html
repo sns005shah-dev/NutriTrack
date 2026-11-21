@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    
+    <title>NutriTrack AI</title>
+    <meta name="description" content="Minimalist AI-Powered Nutrition, Calorie & Body Progress Tracking" />
+
+    <!-- PWA Web App Manifest -->
+    <link rel="manifest" href="manifest.json" />
+
+    <!-- iOS Safari Standalone PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="NutriTrack" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+
+    <!-- Standard Favicons -->
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <meta name="theme-color" content="#111111" />
+    <meta name="color-scheme" content="light" />
+
+    <!-- iOS Home Screen Startup Images & Splash Styling -->
+    <style id="nutritrack-pwa-reset">
+      /* Full height root and body reset */
+      html, body {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: #FFFFFF;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: pan-y;
+        user-select: none;
+        -webkit-user-select: none;
+        overflow: hidden;
+      }
+
+      /* iPhone 14 Notch & Dynamic Island Safe Area Spacing */
+      #root {
+        display: flex;
+        height: 100%;
+        width: 100%;
+        max-width: 480px;
+        margin: 0 auto;
+        flex-direction: column;
+        background-color: #FFFFFF;
+        position: relative;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.04);
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+
+      /* Remove outline on focus */
+      input, textarea, button, select {
+        outline: none;
+      }
+
+      /* Subtle scrollbar */
+      ::-webkit-scrollbar {
+        width: 0px;
+        background: transparent;
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript>Please enable JavaScript to run NutriTrack AI.</noscript>
+    <div id="root"></div>
+
+    <!-- Service Worker Registration for Offline Support -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js')
+            .then((registration) => {
+              console.log('NutriTrack Service Worker registered with scope:', registration.scope);
+            })
+            .catch((error) => {
+              console.warn('NutriTrack Service Worker registration failed:', error);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>

@@ -36,6 +36,16 @@
         }
       ]
     ],
+    "web": {
+      "favicon": "./public/favicon.png",
+      "bundler": "metro",
+      "name": "NutriTrack AI",
+      "shortName": "NutriTrack",
+      "themeColor": "#111111",
+      "backgroundColor": "#FFFFFF",
+      "display": "standalone",
+      "orientation": "portrait"
+    },
     "extra": {
       "eas": {
         "projectId": "b8458f84-146d-4093-99ac-7c5856e3e269"

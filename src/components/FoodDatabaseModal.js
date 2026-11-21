@@ -14,6 +14,7 @@ import {
 import * as Haptics from 'expo-haptics';
 
 import { DEFAULT_FOOD_DATABASE } from '../data/foods';
+import { formatDateHuman } from '../services/dateService';
 import { SearchIcon, CrossIcon } from './Icons';
 
 const CATEGORIES = [
@@ -33,7 +34,8 @@ export default function FoodDatabaseModal({
   onClose,
   onAddFoodItem,
   defaultMealType = 'breakfast',
-  customFoods = []
+  customFoods = [],
+  targetDate
 }) {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -105,7 +107,7 @@ export default function FoodDatabaseModal({
     };
 
     if (onAddFoodItem) {
-      onAddFoodItem(selectedMealType, [itemToAdd]);
+      onAddFoodItem(selectedMealType, [itemToAdd], targetDate);
     }
 
     setTimeout(() => {
@@ -135,6 +137,15 @@ export default function FoodDatabaseModal({
         </View>
 
         <View style={styles.contentWrap}>
+          {/* Target Date Pill */}
+          {targetDate ? (
+            <View style={styles.dateBadge}>
+              <Text style={styles.dateBadgeText}>
+                LOGGING FOR: {formatDateHuman(targetDate).toUpperCase()}
+              </Text>
+            </View>
+          ) : null}
+
           {/* Target Meal Selector */}
           <Text style={styles.sectionLabel}>TARGET MEAL</Text>
           <View style={styles.mealSelectorRow}>
@@ -340,6 +351,22 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 16
+  },
+  dateBadge: {
+    backgroundColor: '#F0F0F0',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#EAEAEA'
+  },
+  dateBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#111111',
+    letterSpacing: 0.5
   },
   sectionLabel: {
     fontSize: 10,

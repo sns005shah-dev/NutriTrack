@@ -3,20 +3,16 @@
 // Manages food diary logs, weight history, body measurements, body composition, and profile targets.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getLocalDateString } from './dateService';
+
+export { getLocalDateString };
+export const getTodayDateString = getLocalDateString;
 
 const APP_STATE_KEY = '@nutritrack_app_state_v1';
 const AI_CONFIG_KEY = '@nutritrack_ai_config_v1';
 
-export function getTodayDateString(offsetDays = 0) {
-  const d = new Date();
-  if (offsetDays !== 0) {
-    d.setDate(d.getDate() + offsetDays);
-  }
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+// In-memory fallback cache for restricted browser/PWA contexts
+const memCache = {};
 
 export const INITIAL_USER_PROFILE = {
   name: '',
@@ -240,9 +236,19 @@ function createInitialSeedData() {
 
 export const StorageService = {
   async loadAppState() {
+    let raw = null;
     try {
-      const raw = await AsyncStorage.getItem(APP_STATE_KEY);
+      raw = await AsyncStorage.getItem(APP_STATE_KEY);
       if (raw) {
+        memCache[APP_STATE_KEY] = raw;
+      }
+    } catch (e) {
+      console.warn('StorageService.loadAppState AsyncStorage error, falling back to memory:', e);
+      raw = memCache[APP_STATE_KEY] || null;
+    }
+
+    if (raw) {
+      try {
         const parsed = JSON.parse(raw);
         // Ensure core collections exist
         if (!parsed.logs) parsed.logs = {};
@@ -278,9 +284,9 @@ export const StorageService = {
           };
         }
         return parsed;
+      } catch (err) {
+        console.warn('Failed to parse app state JSON:', err);
       }
-    } catch (e) {
-      console.warn('StorageService.loadAppState error, creating fresh state:', e);
     }
 
     // Brand new user: return clean initial state without fake data
@@ -296,30 +302,44 @@ export const StorageService = {
   },
 
   async saveAppState(state) {
+    const serialized = JSON.stringify(state);
+    memCache[APP_STATE_KEY] = serialized;
     try {
-      await AsyncStorage.setItem(APP_STATE_KEY, JSON.stringify(state));
+      await AsyncStorage.setItem(APP_STATE_KEY, serialized);
     } catch (e) {
-      console.error('StorageService.saveAppState error:', e);
+      console.error('StorageService.saveAppState error (saved to memory cache):', e);
     }
   },
 
   async loadAiConfig() {
+    let raw = null;
     try {
-      const raw = await AsyncStorage.getItem(AI_CONFIG_KEY);
+      raw = await AsyncStorage.getItem(AI_CONFIG_KEY);
       if (raw) {
-        return { ...INITIAL_AI_CONFIG, ...JSON.parse(raw) };
+        memCache[AI_CONFIG_KEY] = raw;
       }
     } catch (e) {
-      console.warn('StorageService.loadAiConfig error:', e);
+      console.warn('StorageService.loadAiConfig error, falling back to memory:', e);
+      raw = memCache[AI_CONFIG_KEY] || null;
+    }
+
+    if (raw) {
+      try {
+        return { ...INITIAL_AI_CONFIG, ...JSON.parse(raw) };
+      } catch (err) {
+        console.warn('Failed to parse AI config JSON:', err);
+      }
     }
     return { ...INITIAL_AI_CONFIG };
   },
 
   async saveAiConfig(cfg) {
+    const serialized = JSON.stringify(cfg);
+    memCache[AI_CONFIG_KEY] = serialized;
     try {
-      await AsyncStorage.setItem(AI_CONFIG_KEY, JSON.stringify(cfg));
+      await AsyncStorage.setItem(AI_CONFIG_KEY, serialized);
     } catch (e) {
-      console.error('StorageService.saveAiConfig error:', e);
+      console.error('StorageService.saveAiConfig error (saved to memory cache):', e);
     }
   },
 

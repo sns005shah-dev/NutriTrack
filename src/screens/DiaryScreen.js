@@ -12,7 +12,7 @@ import {
 import * as Haptics from 'expo-haptics';
 
 import { computeDailyTotals, computeMealTotals } from '../services/nutritionCalculator';
-import { getTodayDateString } from '../services/storageService';
+import { getLocalDateString, formatDateHuman, getDayNameAndNum } from '../services/dateService';
 import { PlusIcon, TrashIcon } from '../components/Icons';
 
 export default function DiaryScreen({
@@ -24,19 +24,13 @@ export default function DiaryScreen({
   onOpenFoodDbForMeal,
   onDeleteMealItem
 }) {
-  const todayStr = getTodayDateString(0);
+  const todayStr = getLocalDateString(0);
 
-  // Generate 7-day pill strip centered around today
+  // Generate 7-day pill strip centered around today strictly using local calendar dates
   const datePills = [];
   for (let offset = -4; offset <= 2; offset++) {
-    const d = new Date();
-    d.setDate(d.getDate() + offset);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const fullDate = `${yyyy}-${mm}-${dd}`;
-    const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-    const dayNum = d.getDate();
+    const fullDate = getLocalDateString(offset);
+    const { dayName, dayNum } = getDayNameAndNum(fullDate);
     datePills.push({ fullDate, dayName, dayNum, isToday: fullDate === todayStr });
   }
 
@@ -66,7 +60,7 @@ export default function DiaryScreen({
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) {}
-    if (onDeleteMealItem) onDeleteMealItem(mealKey, index);
+    if (onDeleteMealItem) onDeleteMealItem(mealKey, index, selectedDate);
   };
 
   return (
@@ -78,7 +72,7 @@ export default function DiaryScreen({
       {/* Screen Title */}
       <View style={styles.topHeader}>
         <Text style={styles.dateLabel}>
-          {selectedDate === todayStr ? 'TODAY' : selectedDate.toUpperCase()}
+          {formatDateHuman(selectedDate).toUpperCase()}
         </Text>
         <Text style={styles.screenTitle}>Food Diary</Text>
       </View>
@@ -157,7 +151,7 @@ export default function DiaryScreen({
               {/* Add Button */}
               <TouchableOpacity
                 style={styles.addMealButton}
-                onPress={() => onOpenScanForMeal(meal.key)}
+                onPress={() => onOpenScanForMeal(meal.key, selectedDate)}
                 activeOpacity={0.7}
               >
                 <PlusIcon size={14} color="#111111" strokeWidth={2.4} />
@@ -215,21 +209,21 @@ export default function DiaryScreen({
             <View style={styles.mealActionRow}>
               <TouchableOpacity
                 style={styles.mealActionPill}
-                onPress={() => onOpenScanForMeal(meal.key)}
+                onPress={() => onOpenScanForMeal(meal.key, selectedDate)}
               >
                 <Text style={styles.mealActionText}>📷 Scan Photo</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.mealActionPill}
-                onPress={() => onOpenQuickLogForMeal(meal.key)}
+                onPress={() => onOpenQuickLogForMeal(meal.key, selectedDate)}
               >
                 <Text style={styles.mealActionText}>⚡ Quick Log</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.mealActionPill}
-                onPress={() => onOpenFoodDbForMeal(meal.key)}
+                onPress={() => onOpenFoodDbForMeal(meal.key, selectedDate)}
               >
                 <Text style={styles.mealActionText}>🔍 Search</Text>
               </TouchableOpacity>

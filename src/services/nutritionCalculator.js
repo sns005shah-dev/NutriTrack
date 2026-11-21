@@ -1,7 +1,7 @@
 // Nutrition Calculator & Macro/Micro Health Engine
 // BMR, TDEE, BMI, Unit Conversions, Weight Trends, and Comprehensive Micro/Macro Aggregations
 
-import { DEFAULT_FOOD_DATABASE } from '../data/foods';
+import { DEFAULT_FOOD_DATABASE } from '../data/foods.js';
 
 // --- BMI CALCULATION ---
 export function calculateBMI(weightKg, heightCm) {
