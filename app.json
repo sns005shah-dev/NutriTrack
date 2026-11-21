@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "NutriTrack AI",
+    "slug": "nutritrack-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nutritrack.ai",
+      "infoPlist": {
+        "NSCameraUsageDescription": "NutriTrack AI uses your camera to scan and analyze food on your plate for calorie and macro tracking.",
+        "NSPhotoLibraryUsageDescription": "NutriTrack AI needs access to your photos to let you pick meal pictures for AI nutrition analysis."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0D0E11",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "package": "com.nutritrack.ai",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "NutriTrack AI needs access to your photos to analyze meals with AI.",
+          "cameraPermission": "NutriTrack AI needs camera access to scan food and calculate nutrition."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b8458f84-146d-4093-99ac-7c5856e3e269"
+      }
+    },
+    "owner": "devshayan_05"
+  }
+}
