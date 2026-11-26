@@ -1,17 +1,18 @@
 // NutriTrack AI Service Worker
 // Enables offline access, asset caching, and standalone PWA experience
 
-const CACHE_NAME = 'nutritrack-ai-cache-v1';
+const CACHE_NAME = 'nutritrack-ai-cache-v2';
 
 // Static assets to pre-cache on install
 const PRECACHE_ASSETS = [
   './',
   './index.html',
-  './manifest.json',
-  './favicon.png',
-  './icons/apple-touch-icon.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
+  './manifest.json?v=2',
+  './favicon.png?v=2',
+  './icons/apple-touch-icon.png?v=2',
+  './icons/icon-192.png?v=2',
+  './icons/icon-512.png?v=2',
+  './icons/logo.svg?v=2'
 ];
 
 self.addEventListener('install', (event) => {

@@ -56,6 +56,7 @@ export function createFreshInitialState() {
     weightLogs: [],
     measurementLogs: [],
     compositionLogs: [],
+    hydrationLogs: [],
     logs: {
       [today]: {
         waterMl: 0,
@@ -255,6 +256,21 @@ export const StorageService = {
         if (!parsed.weightLogs) parsed.weightLogs = [];
         if (!parsed.measurementLogs) parsed.measurementLogs = [];
         if (!parsed.compositionLogs) parsed.compositionLogs = [];
+        if (!Array.isArray(parsed.hydrationLogs)) {
+          const migrated = [];
+          Object.entries(parsed.logs || {}).forEach(([dateKey, dayObj]) => {
+            const legacyWater = Math.round(Number(dayObj?.waterMl) || 0);
+            if (legacyWater > 0) {
+              migrated.push({
+                id: `hyd_migrated_${dateKey}`,
+                date: dateKey.slice(0, 10),
+                timestamp: `${dateKey.slice(0, 10)}T12:00:00.000Z`,
+                amountMl: legacyWater
+              });
+            }
+          });
+          parsed.hydrationLogs = migrated;
+        }
         if (!parsed.userProfile) parsed.userProfile = { ...INITIAL_USER_PROFILE };
 
         // For returning users who already had data, ensure onboardingCompleted is true

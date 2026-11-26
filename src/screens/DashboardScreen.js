@@ -13,7 +13,8 @@ import * as Haptics from 'expo-haptics';
 
 import MacroRing from '../components/MacroRing';
 import MacroCards from '../components/MacroCards';
-import { CameraIcon, SearchIcon, FlameIcon, ChevronRightIcon } from '../components/Icons';
+import WaterTracker from '../components/WaterTracker';
+import { CameraIcon, SearchIcon, FlameIcon, ChevronRightIcon, NutriTrackLogo } from '../components/Icons';
 import { calculateStreak } from '../services/nutritionCalculator';
 
 export default function DashboardScreen({
@@ -21,6 +22,14 @@ export default function DashboardScreen({
   userProfile,
   dailyTotals,
   logs,
+  todayDateStr,
+  hydrationLogs = [],
+  todayHydrationEntries = [],
+  todayWaterMl = 0,
+  onAddWater,
+  onUndoWater,
+  onEditWaterEntry,
+  onDeleteWaterEntry,
   onOpenScan,
   onOpenQuickLog,
   onOpenFoodDb,
@@ -34,7 +43,7 @@ export default function DashboardScreen({
   });
 
   // Calculate genuine dynamic streak based on actual logged days
-  const streak = calculateStreak(logs, dayLog?.date);
+  const streak = calculateStreak(logs, todayDateStr || dayLog?.date);
 
   // Extract logged items across meals
   const loggedItems = [];
@@ -60,11 +69,16 @@ export default function DashboardScreen({
       contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
     >
-      {/* Top Header: Date & Subtle Streak */}
+      {/* Top Header: Subtle App Logo, Date & Streak */}
       <View style={styles.topHeader}>
-        <View>
-          <Text style={styles.dateLabel}>{todayDate.toUpperCase()}</Text>
-          <Text style={styles.screenTitle}>Today</Text>
+        <View style={styles.brandHeaderRow}>
+          <View style={styles.brandLogoBadge}>
+            <NutriTrackLogo size={22} />
+          </View>
+          <View>
+            <Text style={styles.dateLabel}>{todayDate.toUpperCase()}</Text>
+            <Text style={styles.screenTitle}>Today</Text>
+          </View>
         </View>
 
         <View style={styles.streakPill}>
@@ -128,6 +142,19 @@ export default function DashboardScreen({
           <Text style={[styles.secondaryButtonText, { marginLeft: 6 }]}>Food Search</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Minimalist Home Hydration Tracker Card */}
+      <WaterTracker
+        todayDateStr={todayDateStr}
+        todayEntries={todayHydrationEntries}
+        allHydrationLogs={hydrationLogs}
+        consumedMl={todayWaterMl}
+        goalMl={userProfile?.waterTargetMl || 2500}
+        onAddWater={onAddWater}
+        onUndoLast={onUndoWater}
+        onEditEntry={onEditWaterEntry}
+        onDeleteEntry={onDeleteWaterEntry}
+      />
 
       {/* Today's Food Summary Section */}
       <View style={styles.sectionHeaderRow}>
@@ -220,6 +247,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10
+  },
+  brandHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  brandLogoBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10
   },
   dateLabel: {
     fontSize: 11,

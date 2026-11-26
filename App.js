@@ -1,19 +1,29 @@
 // NutriTrack AI — Cal AI Inspired Native iOS & PWA Application
 // Pure white background, almost-black typography, thick black circular calorie meter, solid black scan action.
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   SafeAreaView,
   View,
   Text,
   StatusBar,
   ActivityIndicator,
-  StyleSheet
+  StyleSheet,
+  AppState,
+  Platform
 } from 'react-native';
 
 import { StorageService } from './src/services/storageService';
 import { getLocalDateString, formatDateHuman } from './src/services/dateService';
 import { computeDailyTotals } from './src/services/nutritionCalculator';
+import {
+  getHydrationEntriesForDate,
+  calculateDailyHydrationMl,
+  addHydrationEntryToLogs,
+  undoLastHydrationEntryForDate,
+  updateHydrationEntryInLogs,
+  deleteHydrationEntryFromLogs
+} from './src/services/hydrationService';
 
 // Navigation & Modals
 import BottomNav from './src/components/BottomNav';
@@ -37,20 +47,65 @@ export default function App() {
   // Active navigation tab: 'home' | 'diary' | 'insights' | 'profile'
   const [activeTab, setActiveTab] = useState('home');
 
-  // Today's immutable local calendar date
-  const todayDateStr = getLocalDateString(0);
+  // Today's local calendar date (automatically updates when calendar day rolls over)
+  const [todayDateStr, setTodayDateStr] = useState(() => getLocalDateString(0));
 
   // Active date for the Diary screen (user can select yesterday, etc.)
-  const [diaryDate, setDiaryDate] = useState(todayDateStr);
+  const [diaryDate, setDiaryDate] = useState(() => getLocalDateString(0));
 
   // Target date for the currently open logging modal
-  const [targetLoggingDate, setTargetLoggingDate] = useState(todayDateStr);
+  const [targetLoggingDate, setTargetLoggingDate] = useState(() => getLocalDateString(0));
   const [targetMealType, setTargetMealType] = useState('lunch');
+
+  // Double-tap / concurrency guard ref for hydration actions
+  const lastHydrationTapRef = useRef(0);
 
   // Modal visibility states
   const [showScan, setShowScan] = useState(false);
   const [showQuickLog, setShowQuickLog] = useState(false);
   const [showFoodDb, setShowFoodDb] = useState(false);
+
+  // Sync local calendar date on foreground resume & midnight rollover
+  useEffect(() => {
+    const syncCalendarDate = () => {
+      const current = getLocalDateString(0);
+      setTodayDateStr((prev) => {
+        if (prev !== current) {
+          setDiaryDate((dPrev) => (dPrev === prev ? current : dPrev));
+          setTargetLoggingDate((tPrev) => (tPrev === prev ? current : tPrev));
+          return current;
+        }
+        return prev;
+      });
+    };
+
+    const appStateSub = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        syncCalendarDate();
+      }
+    });
+
+    let webCleanup = null;
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const onVis = () => {
+        if (document.visibilityState === 'visible') syncCalendarDate();
+      };
+      window.addEventListener('focus', syncCalendarDate);
+      document.addEventListener('visibilitychange', onVis);
+      webCleanup = () => {
+        window.removeEventListener('focus', syncCalendarDate);
+        document.removeEventListener('visibilitychange', onVis);
+      };
+    }
+
+    const timer = setInterval(syncCalendarDate, 30000);
+
+    return () => {
+      if (appStateSub && appStateSub.remove) appStateSub.remove();
+      if (webCleanup) webCleanup();
+      clearInterval(timer);
+    };
+  }, []);
 
   // Load persisted app state on launch
   useEffect(() => {
@@ -96,6 +151,15 @@ export default function App() {
   const todayDailyTotals = useMemo(() => {
     return computeDailyTotals(todayDayLog);
   }, [todayDayLog]);
+
+  // Today's Hydration Entries & Total (strictly filtered to today's local date)
+  const todayHydrationEntries = useMemo(() => {
+    return getHydrationEntriesForDate(appState?.hydrationLogs || [], todayDateStr);
+  }, [appState?.hydrationLogs, todayDateStr]);
+
+  const todayWaterMl = useMemo(() => {
+    return calculateDailyHydrationMl(appState?.hydrationLogs || [], todayDateStr);
+  }, [appState?.hydrationLogs, todayDateStr]);
 
   // Modal open helpers with explicit target date
   const handleOpenScan = (meal = 'lunch', forDate) => {
@@ -273,13 +337,75 @@ export default function App() {
     });
   };
 
+  // Hydration Tracking Handlers (strictly isolated from food diary meals & double-tap guarded)
+  const applyHydrationUpdate = useCallback((updaterFn) => {
+    const activeDate = getLocalDateString(0);
+    setTodayDateStr((prevDate) => (prevDate !== activeDate ? activeDate : prevDate));
+
+    setAppState((prevState) => {
+      if (!prevState) return prevState;
+      const nextHydrationLogs = updaterFn(prevState.hydrationLogs || [], activeDate);
+      const nextTodayWaterMl = calculateDailyHydrationMl(nextHydrationLogs, activeDate);
+      const existingDayLog = (prevState.logs && prevState.logs[activeDate]) || {
+        waterMl: 0,
+        meals: { breakfast: [], lunch: [], dinner: [], snacks: [] }
+      };
+
+      const nextState = {
+        ...prevState,
+        hydrationLogs: nextHydrationLogs,
+        logs: {
+          ...(prevState.logs || {}),
+          [activeDate]: {
+            ...existingDayLog,
+            waterMl: nextTodayWaterMl
+          }
+        }
+      };
+
+      StorageService.saveAppState(nextState);
+      return nextState;
+    });
+  }, []);
+
+  const handleAddWater = useCallback((amountMl) => {
+    const now = Date.now();
+    if (now - lastHydrationTapRef.current < 350) return;
+    lastHydrationTapRef.current = now;
+
+    applyHydrationUpdate((logs, activeDate) => {
+      const { entries } = addHydrationEntryToLogs(logs, amountMl, activeDate);
+      return entries;
+    });
+  }, [applyHydrationUpdate]);
+
+  const handleUndoWater = useCallback(() => {
+    const now = Date.now();
+    if (now - lastHydrationTapRef.current < 350) return;
+    lastHydrationTapRef.current = now;
+
+    applyHydrationUpdate((logs, activeDate) => {
+      const { entries } = undoLastHydrationEntryForDate(logs, activeDate);
+      return entries;
+    });
+  }, [applyHydrationUpdate]);
+
+  const handleEditWaterEntry = useCallback((entryId, newAmountMl) => {
+    applyHydrationUpdate((logs) => updateHydrationEntryInLogs(logs, entryId, newAmountMl));
+  }, [applyHydrationUpdate]);
+
+  const handleDeleteWaterEntry = useCallback((entryId) => {
+    applyHydrationUpdate((logs) => deleteHydrationEntryFromLogs(logs, entryId));
+  }, [applyHydrationUpdate]);
+
   // Onboarding & Lifecycle Handlers
   const handleCompleteOnboarding = (profileData, targets) => {
     const today = getLocalDateString(0);
     const updatedProfile = {
       ...appState.userProfile,
       ...profileData,
-      ...(targets || {})
+      ...(targets || {}),
+      waterTargetMl: appState.userProfile?.waterTargetMl > 0 ? appState.userProfile.waterTargetMl : 2500
     };
 
     const initialWeightLogs = profileData.weightKg
@@ -293,19 +419,22 @@ export default function App() {
         ]
       : [];
 
+    const existingTodayLog = (appState.logs && appState.logs[today]) || {
+      waterMl: 0,
+      meals: { breakfast: [], lunch: [], dinner: [], snacks: [] }
+    };
+
     const newState = {
       ...appState,
       onboardingCompleted: true,
       userProfile: updatedProfile,
-      weightLogs: initialWeightLogs,
-      measurementLogs: [],
-      compositionLogs: [],
+      weightLogs: appState.weightLogs && appState.weightLogs.length > 0 ? appState.weightLogs : initialWeightLogs,
+      measurementLogs: appState.measurementLogs || [],
+      compositionLogs: appState.compositionLogs || [],
+      hydrationLogs: appState.hydrationLogs || [],
       logs: {
         ...appState.logs,
-        [today]: {
-          waterMl: 0,
-          meals: { breakfast: [], lunch: [], dinner: [], snacks: [] }
-        }
+        [today]: existingTodayLog
       }
     };
 
@@ -368,6 +497,14 @@ export default function App() {
             userProfile={profile}
             dailyTotals={todayDailyTotals}
             logs={appState.logs}
+            todayDateStr={todayDateStr}
+            hydrationLogs={appState.hydrationLogs || []}
+            todayHydrationEntries={todayHydrationEntries}
+            todayWaterMl={todayWaterMl}
+            onAddWater={handleAddWater}
+            onUndoWater={handleUndoWater}
+            onEditWaterEntry={handleEditWaterEntry}
+            onDeleteWaterEntry={handleDeleteWaterEntry}
             onOpenScan={() => handleOpenScan('lunch', todayDateStr)}
             onOpenQuickLog={() => handleOpenQuickLog('breakfast', todayDateStr)}
             onOpenFoodDb={() => handleOpenFoodDb('lunch', todayDateStr)}

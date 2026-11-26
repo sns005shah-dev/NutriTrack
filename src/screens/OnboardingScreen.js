@@ -617,9 +617,9 @@ export default function OnboardingScreen({ onComplete, initialProfile = {} }) {
               </View>
 
               <View style={styles.targetGridCell}>
-                <View style={[styles.cellPip, { backgroundColor: '#2563EB' }]} />
+                <View style={[styles.cellPip, { backgroundColor: '#0EA5E9' }]} />
                 <Text style={styles.cellLabel}>WATER</Text>
-                <Text style={styles.cellValue}>{calculatedTargets.waterTargetMl}ml</Text>
+                <Text style={styles.cellValue}>{initialProfile.waterTargetMl > 0 ? initialProfile.waterTargetMl : 2500}ml</Text>
               </View>
             </View>
 

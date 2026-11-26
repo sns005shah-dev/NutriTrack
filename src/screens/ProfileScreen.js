@@ -12,7 +12,8 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
-  StyleSheet
+  StyleSheet,
+  Platform
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
@@ -25,6 +26,7 @@ import {
   ftInToCm
 } from '../services/nutritionCalculator';
 import { StorageService } from '../services/storageService';
+import { formatWaterLiters } from '../services/hydrationService';
 import { CrossIcon } from '../components/Icons';
 
 export default function ProfileScreen({
@@ -109,6 +111,7 @@ export default function ProfileScreen({
   // Reset Confirmation Modal State
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [rerunModalVisible, setRerunModalVisible] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('');
 
   // Unit Toggle Handlers
   const handleToggleWeightUnit = (newUnit) => {
@@ -158,7 +161,7 @@ export default function ProfileScreen({
       fatTarget: targets.fatTarget,
       fiberTarget: targets.fiberTarget,
       sugarTarget: targets.sugarTarget,
-      waterTargetMl: targets.waterTargetMl
+      waterTargetMl: profile.waterTargetMl > 0 ? profile.waterTargetMl : 2500
     };
 
     setProfile(updated);
@@ -173,7 +176,7 @@ export default function ProfileScreen({
       `• Fat Target: ${targets.fatTarget}g\n` +
       `• Fibre Target: ${targets.fiberTarget}g\n` +
       `• Sugar Limit: ${targets.sugarTarget}g\n` +
-      `• Water Intake: ${targets.waterTargetMl} ml`
+      `• Hydration Goal: ${updated.waterTargetMl} ml`
     );
   };
 
@@ -297,8 +300,14 @@ export default function ProfileScreen({
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {}
 
+    const sanitizedProfile = {
+      ...profile,
+      waterTargetMl: profile.waterTargetMl > 0 ? Math.round(profile.waterTargetMl) : 2500
+    };
+    setProfile(sanitizedProfile);
+
     if (onSaveProfile) {
-      onSaveProfile(profile);
+      onSaveProfile(sanitizedProfile);
     }
 
     if (onSaveAiConfig) {
@@ -309,6 +318,8 @@ export default function ProfileScreen({
       });
     }
 
+    setSaveStatus('Settings saved ✓');
+    setTimeout(() => setSaveStatus(''), 3000);
     Alert.alert('Settings Saved', 'Your profile, daily targets, and AI configuration have been updated.');
   };
 
@@ -644,13 +655,48 @@ export default function ProfileScreen({
             />
           </View>
           <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={styles.targetInputLabel}>Water Target (ml)</Text>
+            <Text style={[styles.targetInputLabel, { color: '#0284C7' }]}>
+              Hydration Goal (ml • {formatWaterLiters(profile.waterTargetMl || 2500)})
+            </Text>
             <TextInput
               style={styles.textInput}
               keyboardType="numeric"
-              value={String(profile.waterTargetMl || '')}
-              onChangeText={(v) => setProfile({ ...profile, waterTargetMl: parseInt(v, 10) || 0 })}
+              value={profile.waterTargetMl ? String(profile.waterTargetMl) : ''}
+              placeholder="2500"
+              placeholderTextColor="#858585"
+              onChangeText={(v) => {
+                const digits = v.replace(/[^0-9]/g, '');
+                setProfile({ ...profile, waterTargetMl: digits ? parseInt(digits, 10) : 0 });
+              }}
             />
+          </View>
+        </View>
+
+        {/* Quick Hydration Goal Presets */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+          <Text style={[styles.helperNote, { marginTop: 0 }]}>Quick hydration presets (tracking goal):</Text>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {[2000, 2500, 3000, 3500].map((ml) => {
+              const active = Number(profile.waterTargetMl) === ml;
+              return (
+                <TouchableOpacity
+                  key={ml}
+                  onPress={() => setProfile({ ...profile, waterTargetMl: ml })}
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 8,
+                    backgroundColor: active ? '#111111' : '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: active ? '#111111' : '#EAEAEA'
+                  }}
+                >
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: active ? '#FFFFFF' : '#111111' }}>
+                    {formatWaterLiters(ml)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -917,6 +963,12 @@ export default function ProfileScreen({
       >
         <Text style={styles.saveProfileBtnText}>Save Settings</Text>
       </TouchableOpacity>
+
+      {saveStatus ? (
+        <Text style={{ textAlign: 'center', fontSize: 12, fontWeight: '700', color: '#16A34A', marginTop: 8 }}>
+          {saveStatus}
+        </Text>
+      ) : null}
 
       <View style={{ height: 88 }} />
 

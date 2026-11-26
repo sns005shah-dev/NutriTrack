@@ -224,6 +224,69 @@ export function ScanReticleIcon({ size = 48, color = '#111111', strokeWidth = 2.
   );
 }
 
+export function NutriTrackLogo({ size = 24 }) {
+  return (
+    <Svg width={size} height={size} viewBox="102 96 318 320" fill="none">
+      <Path
+        d="M118 114 C118 109.582 121.582 106 126 106 C130.418 106 134 109.582 134 114 V176 C134 178.761 136.239 181 139 181 C141.761 181 144 178.761 144 176 V114 C144 109.582 147.582 106 152 106 C156.418 106 160 109.582 160 114 V176 C160 178.761 162.239 181 165 181 C167.761 181 170 178.761 170 176 V114 C170 109.582 173.582 106 178 106 C182.418 106 186 109.582 186 114 V142 L330 306 V248 L394 194 V392 C394 399.732 387.732 406 380 406 H330 L186 241 V392 C186 399.732 179.732 406 172 406 H132 C124.268 406 118 399.732 118 392 V114 Z"
+        fill="#111111"
+      />
+      <Path
+        d="M332 224 C322 162 348 118 396 106 C404 156 382 194 332 224 Z"
+        fill="#22C55E"
+      />
+      <Path
+        d="M346 200 C354 184 364 162 376 144"
+        stroke="#FFFFFF"
+        strokeWidth="8"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+export function WaterDropIcon({ size = 18, color = '#0EA5E9', strokeWidth = 1.9 }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 2.69L17.66 8.35C20.78 11.47 20.78 16.53 17.66 19.65C14.54 22.77 9.46 22.77 6.34 19.65C3.22 16.53 3.22 11.47 6.34 8.35L12 2.69Z"
+        fill="#E0F2FE"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M8.5 14.5C8.5 16.433 10.067 18 12 18"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+export function UndoIcon({ size = 14, color = '#858585', strokeWidth = 2 }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M9 14L4 9L9 4"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M4 9H14.5C17.5376 9 20 11.4624 20 14.5C20 17.5376 17.5376 20 14.5 20H11"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 export default {
   HomeIcon,
   DiaryIcon,
@@ -243,5 +306,8 @@ export default {
   TrashIcon,
   FlameIcon,
   SparkleIcon,
-  ScanReticleIcon
+  ScanReticleIcon,
+  NutriTrackLogo,
+  WaterDropIcon,
+  UndoIcon
 };
