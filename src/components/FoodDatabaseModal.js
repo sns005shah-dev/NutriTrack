@@ -344,7 +344,10 @@ export default function FoodDatabaseModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF'
+    backgroundColor: '#FFFFFF',
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center'
   },
   modalHeaderWrapper: {
     backgroundColor: '#FFFFFF',

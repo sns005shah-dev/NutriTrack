@@ -918,7 +918,7 @@ export default function ProfileScreen({
         <Text style={styles.saveProfileBtnText}>Save Settings</Text>
       </TouchableOpacity>
 
-      <View style={{ height: 110 }} />
+      <View style={{ height: 88 }} />
 
       {/* ========================================================================= */}
       {/* BACKUP EXPORT / IMPORT MODAL                                              */}
@@ -931,13 +931,20 @@ export default function ProfileScreen({
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setBackupModalVisible(false)} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={() => setBackupModalVisible(false)}
+              style={styles.closeBtn}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Close Backup Modal"
+            >
               <CrossIcon size={20} color="#111111" />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
               {backupModalMode === 'export' ? 'JSON Data Backup' : 'Import JSON Backup'}
             </Text>
-            <View style={{ width: 24 }} />
+            <View style={styles.headerRightSpacer} />
           </View>
 
           <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
@@ -1070,7 +1077,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: 20,
-    paddingTop: 10
+    paddingTop: 12
   },
   topHeader: {
     marginBottom: 16
@@ -1499,24 +1506,38 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF'
+    backgroundColor: '#FFFFFF',
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center'
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'web' ? 'max(14px, env(safe-area-inset-top, 16px))' : 14,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#EAEAEA'
   },
   closeBtn: {
-    padding: 6
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   modalTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#111111'
+    color: '#111111',
+    textAlign: 'center'
+  },
+  headerRightSpacer: {
+    width: 44,
+    height: 44
   },
   modalBody: {
     flex: 1,

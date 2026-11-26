@@ -201,7 +201,7 @@ export default function DashboardScreen({
       )}
 
       {/* Safe bottom spacing for bottom navigation bar */}
-      <View style={{ height: 110 }} />
+      <View style={{ height: 88 }} />
     </ScrollView>
   );
 }
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: 20,
-    paddingTop: 10
+    paddingTop: 12
   },
   topHeader: {
     flexDirection: 'row',

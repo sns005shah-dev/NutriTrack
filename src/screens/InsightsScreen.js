@@ -1182,7 +1182,7 @@ export default function InsightsScreen({
         }}
       />
 
-      <View style={{ height: 40 }} />
+      <View style={{ height: 88 }} />
     </ScrollView>
   );
 }
@@ -1193,7 +1193,7 @@ export default function InsightsScreen({
 
 // Weight Trend Line Chart with Moving Average Curve
 function WeightChartSvg({ data = [], targetKg = 70, weightUnit = 'kg' }) {
-  const chartW = SCREEN_WIDTH - 64;
+  const chartW = Math.min(SCREEN_WIDTH, 480) - 76;
   const chartH = 150;
   const paddingX = 24;
   const paddingY = 20;
@@ -1307,7 +1307,7 @@ function WeightChartSvg({ data = [], targetKg = 70, weightUnit = 'kg' }) {
 
 // Calorie Intake Daily Bars Chart
 function CalorieBarChartSvg({ data = [], targetCal = 2150 }) {
-  const chartW = SCREEN_WIDTH - 64;
+  const chartW = Math.min(SCREEN_WIDTH, 480) - 76;
   const chartH = 110;
   const maxCal = Math.max(targetCal * 1.25, ...data.map((d) => d.calories || 0));
   const targetY = chartH - (targetCal / maxCal) * chartH;
@@ -1380,8 +1380,8 @@ const styles = StyleSheet.create({
   },
   contentWrap: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 40
+    paddingTop: 12,
+    paddingBottom: 0
   },
   topHeader: {
     marginBottom: 16

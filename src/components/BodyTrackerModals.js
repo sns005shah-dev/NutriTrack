@@ -10,7 +10,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  StyleSheet
+  StyleSheet,
+  Platform
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
@@ -86,11 +87,18 @@ export function LogWeightModal({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.modalContainer}>
         <View style={styles.headerBar}>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <CrossIcon size={20} color="#111111" />
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeBtn}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Close Weight Modal"
+          >
+            <CrossIcon size={20} color="#111111" strokeWidth={2.4} />
           </TouchableOpacity>
           <Text style={styles.modalTitle}>{editingEntry ? 'Edit Weight Entry' : 'Log Weight'}</Text>
-          <View style={{ width: 24 }} />
+          <View style={styles.headerRightSpacer} />
         </View>
 
         <ScrollView style={styles.contentArea} contentContainerStyle={styles.contentWrap}>
@@ -204,11 +212,18 @@ export function LogMeasurementsModal({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.modalContainer}>
         <View style={styles.headerBar}>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <CrossIcon size={20} color="#111111" />
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeBtn}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Close Measurements Modal"
+          >
+            <CrossIcon size={20} color="#111111" strokeWidth={2.4} />
           </TouchableOpacity>
           <Text style={styles.modalTitle}>Body Measurements ({measurementUnit.toUpperCase()})</Text>
-          <View style={{ width: 24 }} />
+          <View style={styles.headerRightSpacer} />
         </View>
 
         <ScrollView style={styles.contentArea} contentContainerStyle={styles.contentWrap}>
@@ -310,11 +325,18 @@ export function LogCompositionModal({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.modalContainer}>
         <View style={styles.headerBar}>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <CrossIcon size={20} color="#111111" />
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeBtn}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Close Composition Modal"
+          >
+            <CrossIcon size={20} color="#111111" strokeWidth={2.4} />
           </TouchableOpacity>
           <Text style={styles.modalTitle}>Body Composition</Text>
-          <View style={{ width: 24 }} />
+          <View style={styles.headerRightSpacer} />
         </View>
 
         <ScrollView style={styles.contentArea} contentContainerStyle={styles.contentWrap}>
@@ -419,24 +441,38 @@ export function EditHeightModal({
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF'
+    backgroundColor: '#FFFFFF',
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center'
   },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'web' ? 'max(14px, env(safe-area-inset-top, 16px))' : 14,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#EAEAEA'
   },
   closeBtn: {
-    padding: 6
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   modalTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#111111'
+    color: '#111111',
+    textAlign: 'center'
+  },
+  headerRightSpacer: {
+    width: 44,
+    height: 44
   },
   contentArea: {
     flex: 1
@@ -526,7 +562,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    paddingBottom: 36
+    paddingBottom: Platform.OS === 'web' ? 'max(36px, calc(env(safe-area-inset-bottom, 20px) + 20px))' : 36,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center'
   },
   sheetTitle: {
     fontSize: 18,

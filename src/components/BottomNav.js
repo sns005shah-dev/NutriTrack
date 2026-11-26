@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    minHeight: 80,
+    minHeight: 78,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#EAEAEA',
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingTop: 6,
-    paddingBottom: Platform.OS === 'web' ? 'max(20px, calc(env(safe-area-inset-bottom, 20px) + 4px))' : 24,
+    paddingBottom: Platform.OS === 'web' ? 'max(16px, env(safe-area-inset-bottom, 16px))' : 20,
     paddingHorizontal: 8,
     zIndex: 100
   },

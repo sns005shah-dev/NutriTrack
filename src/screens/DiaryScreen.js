@@ -232,7 +232,7 @@ export default function DiaryScreen({
         );
       })}
 
-      <View style={{ height: 110 }} />
+      <View style={{ height: 88 }} />
     </ScrollView>
   );
 }
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: 20,
-    paddingTop: 10
+    paddingTop: 12
   },
   topHeader: {
     marginBottom: 10

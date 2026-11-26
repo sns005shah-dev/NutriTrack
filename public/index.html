@@ -24,6 +24,11 @@
 
     <!-- iOS Home Screen Startup Images & Splash Styling -->
     <style id="nutritrack-pwa-reset">
+      /* Universal box sizing */
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+
       /* Full height root and body reset */
       html, body {
         height: 100%;
@@ -45,6 +50,8 @@
       #root {
         display: flex;
         height: 100%;
+        height: 100dvh;
+        max-height: 100%;
         width: 100%;
         max-width: 480px;
         margin: 0 auto;
@@ -52,8 +59,10 @@
         background-color: #FFFFFF;
         position: relative;
         box-shadow: 0 0 40px rgba(0, 0, 0, 0.04);
-        padding-top: env(safe-area-inset-top);
-        padding-bottom: env(safe-area-inset-bottom);
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: 0px;
+        overflow: hidden;
       }
 
       /* Remove outline on focus */
