@@ -1,7 +1,7 @@
 // Cal AI Minimalist Food Scanner Modal
 // Gemini 3.5 Flash-Lite Multimodal Vision, camera & gallery picker, pre-save portion editing, solid black save button.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -42,6 +42,12 @@ export default function ScanModal({
   const [editableItems, setEditableItems] = useState([]);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (defaultMealType) {
+      setSelectedMealType(defaultMealType);
+    }
+  }, [defaultMealType, visible]);
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemGrams, setNewItemGrams] = useState('100');
@@ -242,13 +248,22 @@ export default function ScanModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.headerBar}>
-          <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <CrossIcon size={20} color="#111111" />
-          </TouchableOpacity>
-          <Text style={styles.screenTitle}>Scan Meal</Text>
-          <View style={{ width: 24 }} />
+        {/* Header with Safe Area Inset */}
+        <View style={styles.modalHeaderWrapper}>
+          <View style={styles.headerBar}>
+            <TouchableOpacity
+              onPress={handleClose}
+              style={styles.closeBtn}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Close Scan Modal"
+            >
+              <CrossIcon size={20} color="#111111" strokeWidth={2.4} />
+            </TouchableOpacity>
+            <Text style={styles.screenTitle}>Scan Meal</Text>
+            <View style={styles.headerRightSpacer} />
+          </View>
         </View>
 
         <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -514,22 +529,36 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF'
   },
+  modalHeaderWrapper: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EAEAEA',
+    paddingTop: Platform.OS === 'web' ? 'max(14px, env(safe-area-inset-top, 16px))' : 14,
+    paddingHorizontal: 16
+  },
   headerBar: {
+    height: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EAEAEA'
+    justifyContent: 'space-between'
   },
   closeBtn: {
-    padding: 6
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   screenTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#111111'
+    color: '#111111',
+    textAlign: 'center'
+  },
+  headerRightSpacer: {
+    width: 44,
+    height: 44
   },
   scrollArea: {
     flex: 1

@@ -1,10 +1,12 @@
-// NutriTrack AI Engine for Mobile (React Native / Expo)
+// NutriTrack AI Engine for Mobile (React Native / Expo) & PWA
 // Dual-mode: Natural Language Text Meal Parsing + Multimodal Camera/Photo Vision Food Scanning
-// Powered by Google Gemini 3.5 Flash-Lite with compound meal heuristic fallback and JSON auto-repair.
+// Connects through Cloudflare Pages serverless proxy (/api/analyze-meal, /api/analyze-image)
+// with direct client-side Gemini fallback.
+// High-precision Indian food intelligence & packaged snack price recognition.
 
-import { DEFAULT_FOOD_DATABASE } from '../data/foods';
+import { DEFAULT_FOOD_DATABASE } from '../data/foods.js';
 
-export const DEFAULT_AI_KEY = process.env.EXPO_PUBLIC_AI_KEY;
+export const DEFAULT_AI_KEY = process.env.EXPO_PUBLIC_AI_KEY || '';
 export const PRIMARY_MODEL = 'gemini-3.5-flash-lite';
 
 export const VERIFIED_MODELS = [
@@ -63,128 +65,88 @@ export function repairJsonString(raw) {
   return str;
 }
 
-// Compound meal heuristic database for instant offline fallback
-export const HEURISTIC_DATABASE = {
-  'egg': { name: 'Boiled Egg', portion: '1 large egg (50g)', grams: 50, calories: 72, protein: 6.3, carbs: 0.4, fat: 4.8, fiber: 0, icon: '🥚' },
-  'boiled egg': { name: 'Boiled Egg', portion: '1 large egg (50g)', grams: 50, calories: 72, protein: 6.3, carbs: 0.4, fat: 4.8, fiber: 0, icon: '🥚' },
-  'scrambled egg': { name: 'Scrambled Egg', portion: '1 egg (50g)', grams: 50, calories: 91, protein: 6.3, carbs: 0.8, fat: 6.7, fiber: 0, icon: '🍳' },
-  'bread': { name: 'Bread Slice', portion: '1 slice (45g)', grams: 45, calories: 115, protein: 4.0, carbs: 22.0, fat: 1.2, fiber: 1.5, icon: '🍞' },
-  'toast': { name: 'Toast Slice', portion: '1 slice (45g)', grams: 45, calories: 115, protein: 4.0, carbs: 22.0, fat: 1.2, fiber: 1.5, icon: '🍞' },
-  'roti': { name: 'Whole Wheat Roti', portion: '1 roti (40g)', grams: 40, calories: 109, protein: 3.0, carbs: 21.0, fat: 1.2, fiber: 2.8, icon: '🫓' },
-  'chapati': { name: 'Chapati', portion: '1 chapati (40g)', grams: 40, calories: 109, protein: 3.0, carbs: 21.0, fat: 1.2, fiber: 2.8, icon: '🫓' },
-  'chicken biryani': { name: 'Chicken Biryani', portion: '100g portion', grams: 100, calories: 180, protein: 9.5, carbs: 22.0, fat: 6.0, fiber: 1.0, icon: '🍛' },
-  'biryani': { name: 'Biryani', portion: '100g portion', grams: 100, calories: 180, protein: 8.5, carbs: 24.0, fat: 5.5, fiber: 1.0, icon: '🍛' },
-  'besan chilla': { name: 'Besan Chilla', portion: '1 chilla (70g)', grams: 70, calories: 140, protein: 6.5, carbs: 18.0, fat: 4.5, fiber: 3.0, icon: '🥞' },
-  'chilla': { name: 'Besan Chilla', portion: '1 chilla (70g)', grams: 70, calories: 140, protein: 6.5, carbs: 18.0, fat: 4.5, fiber: 3.0, icon: '🥞' },
-  'rice': { name: 'Steamed Rice', portion: '1 cup cooked (150g)', grams: 150, calories: 195, protein: 4.0, carbs: 43.0, fat: 0.4, fiber: 0.6, icon: '🍚' },
-  'chicken breast': { name: 'Grilled Chicken Breast', portion: '150g fillet', grams: 150, calories: 247, protein: 46.5, carbs: 0, fat: 5.4, fiber: 0, icon: '🍗' },
-  'chicken': { name: 'Chicken', portion: '100g cooked', grams: 100, calories: 180, protein: 25.0, carbs: 0, fat: 8.0, fiber: 0, icon: '🍗' },
-  'salmon': { name: 'Baked Salmon', portion: '150g fillet', grams: 150, calories: 309, protein: 33.0, carbs: 0, fat: 18.5, fiber: 0, icon: '🐟' },
-  'apple': { name: 'Fresh Apple', portion: '1 medium (182g)', grams: 182, calories: 95, protein: 0.5, carbs: 25.0, fat: 0.3, fiber: 4.4, icon: '🍎' },
-  'banana': { name: 'Banana', portion: '1 medium (118g)', grams: 118, calories: 105, protein: 1.3, carbs: 27.0, fat: 0.4, fiber: 3.1, icon: '🍌' },
-  'oats': { name: 'Rolled Oats (Cooked)', portion: '1 cup (234g)', grams: 234, calories: 166, protein: 5.9, carbs: 28.1, fat: 3.6, fiber: 4.0, icon: '🥣' },
-  'magaz': { name: 'Magaz (Brain Curry)', portion: 'half bowl (100g)', grams: 100, calories: 135, protein: 10.0, carbs: 2.0, fat: 9.5, fiber: 0, icon: '🍲' }
-};
+// High-precision prompt template with Indian Food & Packaged Pricing Intelligence
+export function buildTextMealPrompt(queryText) {
+  return `You are a clinical nutrition specialist, Indian food expert, and food packaging database AI.
+Analyze the user's meal input: "${queryText}".
 
-// Offline heuristic fallback parser
-export function parseMealOffline(text) {
-  const query = text.toLowerCase().trim();
-  const foundItems = [];
+CRITICAL PARSING RULES:
+1. PACKAGED FOODS & PRICING:
+   - When prices like ₹5, ₹10, ₹20, ₹30, Rs 10, or 10 rs appear (e.g. "Bingo Nachos ₹10 packet", "Lays ₹10 packet", "Kurkure ₹20"), interpret the number as an Indian rupee price point, NEVER as food weight in grams.
+   - Do NOT assume a generic 150g portion for small packaged snacks! Standard Indian ₹5 packets are ~16g–20g (approx 80–110 kcal). Standard ₹10 packets are ~25g–35g (approx 130–180 kcal). Standard ₹20 packets are ~50g–70g (approx 260–360 kcal). For "Bingo Nachos ₹10 packet", standard net weight is approximately 30g–35g.
+   - If the user provides packet weight, strictly use that weight.
 
-  // Split query on 'and', '+', ',', '&'
-  const phrases = query.split(/\band\b|\+|\band\/or\b|,|&/i).map(s => s.trim()).filter(Boolean);
+2. INDIAN STREET & RESTAURANT FOODS:
+   - "Beef roll" / "Chicken roll" (Kolkata/Kathi roll style): typically 1 paratha flatbread rolled with ~70-90g spiced cooked meat, sliced red onions, green chillies, and chutney/sauce. Typical net weight 180g–220g; 380–480 kcal; 22–28g protein; 35–45g carbs; 16–22g fat.
+   - "Chicken biryani" / "Mutton biryani": 1 standard plate/portion (300g–350g) is ~500–650 kcal; 25–35g protein; 60–75g carbs; 15–22g fat.
+   - "Roti" / "Chapati": 1 standard whole wheat roti (35g–40g) is ~100–115 kcal; 3g protein; 22g carbs; 1.2g fat.
+   - "Besan chilla": 1 medium gram-flour savoury pancake (~70g) is ~135–150 kcal; 6–7g protein; 18–20g carbs; 4–5g fat.
+   - "Samosa": 1 medium potato-filled samosa (~80g–90g) is ~220–260 kcal; 3.5g protein; 25–28g carbs; 12–15g fat.
 
-  for (const phrase of phrases) {
-    // Check quantity prefix e.g. "2 boiled eggs", "100g chicken biryani", "half bowl magaz"
-    let multiplier = 1;
-    let cleanPhrase = phrase;
+3. MACRONUTRIENT CONSISTENCY:
+   - Keep macro totals mathematically consistent: Calories ≈ (4 × Protein) + (4 × Carbs) + (9 × Fat) ± 5%.
+   - Estimate fiber and sugar realistically.
 
-    const countMatch = phrase.match(/^(\d+(?:\.\d+)?)\s*(?:slices?|pieces?|large|cups?|bowls?)?\s+(.*)/i);
-    const weightMatch = phrase.match(/^(\d+(?:\.\d+)?)\s*(?:g|grams)\s+(.*)/i);
-    const halfMatch = phrase.match(/^half\s+(?:bowl|cup|plate)?\s*(.*)/i);
+4. ACCURACY GUARANTEE:
+   - Every input MUST be individually evaluated. Never return identical generic values for distinct foods.
+   - If portion is ambiguous, state standard assumption in the portion field (e.g. "1 standard packet (35g)").
 
-    if (weightMatch) {
-      multiplier = parseFloat(weightMatch[1]) / 100;
-      cleanPhrase = weightMatch[2].trim();
-    } else if (countMatch) {
-      multiplier = parseFloat(countMatch[1]);
-      cleanPhrase = countMatch[2].trim();
-    } else if (halfMatch) {
-      multiplier = 0.5;
-      cleanPhrase = halfMatch[1].trim();
+You MUST respond strictly with a valid JSON object matching this schema without any markdown commentary:
+{
+  "meal_name": "string (concise descriptive name)",
+  "items": [
+    {
+      "name": "string (food item name)",
+      "portion": "string (e.g. 1 packet (35g), 1 roll (200g))",
+      "weight_g": number,
+      "calories": number,
+      "protein": number,
+      "carbs": number,
+      "fat": number,
+      "fiber": number,
+      "sugar": number
     }
+  ],
+  "total_calories": number,
+  "total_protein": number,
+  "total_carbs": number,
+  "total_fat": number,
+  "total_fiber": number,
+  "total_sugar": number
+}`;
+}
 
-    // Match against heuristic keys
-    let matchedKey = null;
-    for (const key of Object.keys(HEURISTIC_DATABASE)) {
-      if (cleanPhrase.includes(key) || key.includes(cleanPhrase)) {
-        matchedKey = key;
-        break;
-      }
-    }
-
-    if (matchedKey) {
-      const base = HEURISTIC_DATABASE[matchedKey];
-      foundItems.push({
-        id: 'off_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-        name: base.name,
-        portion: multiplier !== 1 ? `${multiplier}x ${base.portion}` : base.portion,
-        grams: Math.round(base.grams * multiplier),
-        calories: Math.round(base.calories * multiplier),
-        protein: Math.round(base.protein * multiplier * 10) / 10,
-        carbs: Math.round(base.carbs * multiplier * 10) / 10,
-        fat: Math.round(base.fat * multiplier * 10) / 10,
-        fiber: Math.round(base.fiber * multiplier * 10) / 10,
-        icon: base.icon
-      });
-    }
+// Normalizes and sanitizes AI response items
+function normalizeAiResponse(parsed, targetModel, source) {
+  if (parsed.items && Array.isArray(parsed.items)) {
+    parsed.items = parsed.items.map((item, idx) => ({
+      id: `ai_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`,
+      name: item.name || 'Food item',
+      portion: item.portion || `${item.weight_g || item.grams || 100}g`,
+      grams: Number(item.weight_g || item.grams) || 100,
+      calories: Math.round(Number(item.calories) || 0),
+      protein: Math.round((Number(item.protein) || 0) * 10) / 10,
+      carbs: Math.round((Number(item.carbs) || 0) * 10) / 10,
+      fat: Math.round((Number(item.fat) || 0) * 10) / 10,
+      fiber: Math.round((Number(item.fiber) || 0) * 10) / 10,
+      sugar: Math.round((Number(item.sugar) || 0) * 10) / 10,
+      saturatedFat: Math.round((Number(item.saturatedFat) || 0) * 10) / 10,
+      icon: getFoodIcon(item.name)
+    }));
   }
 
-  if (foundItems.length > 0) {
-    let totCal = 0, totProt = 0, totCarb = 0, totFat = 0, totFib = 0;
-    foundItems.forEach(i => {
-      totCal += i.calories;
-      totProt += i.protein;
-      totCarb += i.carbs;
-      totFat += i.fat;
-      totFib += i.fiber;
-    });
-    return {
-      meal_name: text.length > 30 ? text.substring(0, 30) + '...' : text,
-      items: foundItems,
-      total_calories: Math.round(totCal),
-      total_protein: Math.round(totProt * 10) / 10,
-      total_carbs: Math.round(totCarb * 10) / 10,
-      total_fat: Math.round(totFat * 10) / 10,
-      total_fiber: Math.round(totFib * 10) / 10,
-      source: 'offline_heuristic'
-    };
-  }
+  // Recalculate totals from items for internal consistency
+  const items = parsed.items || [];
+  parsed.total_calories = items.reduce((acc, i) => acc + (i.calories || 0), 0);
+  parsed.total_protein = Math.round(items.reduce((acc, i) => acc + (i.protein || 0), 0) * 10) / 10;
+  parsed.total_carbs = Math.round(items.reduce((acc, i) => acc + (i.carbs || 0), 0) * 10) / 10;
+  parsed.total_fat = Math.round(items.reduce((acc, i) => acc + (i.fat || 0), 0) * 10) / 10;
+  parsed.total_fiber = Math.round(items.reduce((acc, i) => acc + (i.fiber || 0), 0) * 10) / 10;
+  parsed.total_sugar = Math.round(items.reduce((acc, i) => acc + (i.sugar || 0), 0) * 10) / 10;
 
-  // Generic estimation if completely uncatalogued
-  return {
-    meal_name: text,
-    items: [
-      {
-        id: 'off_gen_' + Date.now(),
-        name: text,
-        portion: '1 serving (150g)',
-        grams: 150,
-        calories: 250,
-        protein: 12.0,
-        carbs: 30.0,
-        fat: 8.0,
-        fiber: 2.0,
-        icon: '🍽️'
-      }
-    ],
-    total_calories: 250,
-    total_protein: 12.0,
-    total_carbs: 30.0,
-    total_fat: 8.0,
-    total_fiber: 2.0,
-    source: 'offline_heuristic_generic'
-  };
+  parsed.source = source || 'gemini_text';
+  parsed.modelUsed = targetModel;
+  return parsed;
 }
 
 // 1. Natural Language Text Meal Parsing
@@ -193,97 +155,94 @@ export async function analyzeMealText(queryText, userApiKey = '', model = PRIMAR
     throw new Error('Please enter a meal description.');
   }
 
+  const cleanQuery = queryText.trim();
   const apiKey = cleanApiKey(userApiKey);
-  const prompt = `You are a clinical dietitian and precise nutrition database AI.
-Analyze the following food/meal input: "${queryText.trim()}".
-
-Break down every individual food item and estimate portion size, weight in grams, calories, protein (g), carbs (g), fat (g), and fiber (g). Calibrate using USDA FoodData Central.
-
-You MUST respond strictly with a valid JSON object matching this schema without any markdown commentary:
-{
-  "meal_name": "string (concise title of the meal)",
-  "items": [
-    {
-      "name": "string (food name)",
-      "portion": "string (e.g. 2 large eggs, 100g, 1 slice)",
-      "weight_g": number,
-      "calories": number,
-      "protein": number,
-      "carbs": number,
-      "fat": number,
-      "fiber": number
-    }
-  ],
-  "total_calories": number,
-  "total_protein": number,
-  "total_carbs": number,
-  "total_fat": number,
-  "total_fiber": number
-}`;
-
   const targetModel = model === 'auto' || !model ? PRIMARY_MODEL : model;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent`;
 
+  // STEP 1: Attempt Cloudflare Pages Serverless Proxy (/api/analyze-meal)
   try {
-    const response = await fetch(url, {
+    const proxyRes = await fetch('/api/analyze-meal', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
+        ...(apiKey ? { 'x-gemini-api-key': apiKey } : {})
       },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.1,
-          response_mime_type: 'application/json'
-        }
-      })
+      body: JSON.stringify({ queryText: cleanQuery, model: targetModel })
     });
 
-    if (!response.ok) {
-      console.warn(`Gemini text API responded with HTTP ${response.status}. Using offline heuristic fallback.`);
-      return parseMealOffline(queryText);
+    if (proxyRes.ok) {
+      const data = await proxyRes.json();
+      if (data && data.items && data.items.length > 0) {
+        return normalizeAiResponse(data, targetModel, 'gemini_server_proxy');
+      }
+    } else if (proxyRes.status !== 404) {
+      // 404 indicates the Cloudflare Function is not running (e.g. local Metro or pure static hosting).
+      // Any other status (400, 401, 403, 500) represents an explicit error from the server.
+      const errJson = await proxyRes.json().catch(() => ({}));
+      // If 401 and user has provided a client-side key, fallback to direct Gemini endpoint below
+      if (proxyRes.status === 401 && apiKey) {
+        console.info('Proxy returned 401 without server key; falling back to client-provided key.');
+      } else if (errJson.error) {
+        throw new Error(errJson.error);
+      }
     }
-
-    const data = await response.json();
-    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawText) {
-      return parseMealOffline(queryText);
-    }
-
-    const cleanJson = repairJsonString(rawText);
-    const parsed = JSON.parse(cleanJson);
-
-    // Normalize items with icons and IDs
-    if (parsed.items && Array.isArray(parsed.items)) {
-      parsed.items = parsed.items.map((item, idx) => ({
-        id: `ai_${Date.now()}_${idx}`,
-        name: item.name || 'Food item',
-        portion: item.portion || `${item.weight_g || 100}g`,
-        grams: Number(item.weight_g) || 100,
-        calories: Math.round(Number(item.calories) || 0),
-        protein: Math.round((Number(item.protein) || 0) * 10) / 10,
-        carbs: Math.round((Number(item.carbs) || 0) * 10) / 10,
-        fat: Math.round((Number(item.fat) || 0) * 10) / 10,
-        fiber: Math.round((Number(item.fiber) || 0) * 10) / 10,
-        sugar: Math.round((Number(item.sugar) || 0) * 10) / 10,
-        saturatedFat: Math.round((Number(item.saturatedFat) || 0) * 10) / 10,
-        icon: getFoodIcon(item.name)
-      }));
-    }
-
-    parsed.source = 'gemini_text';
-    parsed.modelUsed = targetModel;
-    return parsed;
   } catch (err) {
-    console.warn('analyzeMealText error, using heuristic fallback:', err.message);
-    return parseMealOffline(queryText);
+    // If error is an explicit rejection from the server, propagate it to inform the user
+    if (err.message && !err.message.includes('fetch') && !err.message.includes('NetworkError') && !err.message.includes('404')) {
+      throw err;
+    }
   }
+
+  // STEP 2: Direct Google Gemini API Call (Fallback for local dev or static hosting)
+  if (!apiKey) {
+    throw new Error(
+      'Gemini API key is not configured. Please enter your API key in Settings > Google Gemini AI Engine.'
+    );
+  }
+
+  const prompt = buildTextMealPrompt(cleanQuery);
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.1,
+        response_mime_type: 'application/json'
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errMsg = `Gemini API error (HTTP ${response.status})`;
+    try {
+      const parsedErr = JSON.parse(errorText);
+      if (parsedErr.error && parsedErr.error.message) {
+        errMsg = parsedErr.error.message;
+      }
+    } catch (e) {}
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!rawText) {
+    throw new Error('AI returned an empty response. Please describe the meal in more detail.');
+  }
+
+  const cleanJson = repairJsonString(rawText);
+  let parsed;
+  try {
+    parsed = JSON.parse(cleanJson);
+  } catch (parseErr) {
+    throw new Error('AI returned an unparseable response format. Please try again.');
+  }
+
+  return normalizeAiResponse(parsed, targetModel, 'gemini_direct_client');
 }
 
 // 2. Multimodal Camera / Photo Food Scanning
@@ -293,12 +252,49 @@ export async function analyzeFoodImage(base64Data, mimeType = 'image/jpeg', user
   }
 
   const apiKey = cleanApiKey(userApiKey);
-  // Clean base64 string if it contains data URI prefix
   const pureBase64 = base64Data.replace(/^data:image\/[a-z]+;base64,/, '').trim();
+  const targetModel = model === 'auto' || !model ? PRIMARY_MODEL : model;
 
-  const prompt = `You are an elite AI nutritionist and computer vision food expert.
-Carefully examine the foods and beverages visible in this image.
-Identify every item on the plate, estimate standard portion sizes, approximate weight in grams, and calculate USDA-calibrated nutritional values (calories, protein, carbs, fat, fiber).
+  // STEP 1: Attempt Cloudflare Pages Serverless Proxy (/api/analyze-image)
+  try {
+    const proxyRes = await fetch('/api/analyze-image', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { 'x-gemini-api-key': apiKey } : {})
+      },
+      body: JSON.stringify({ imageBase64: pureBase64, mimeType, model: targetModel })
+    });
+
+    if (proxyRes.ok) {
+      const data = await proxyRes.json();
+      if (data && data.items && data.items.length > 0) {
+        return normalizeAiResponse(data, targetModel, 'gemini_vision_proxy');
+      }
+    } else if (proxyRes.status !== 404) {
+      const errJson = await proxyRes.json().catch(() => ({}));
+      if (proxyRes.status === 401 && apiKey) {
+        console.info('Proxy returned 401; falling back to direct client key.');
+      } else if (errJson.error) {
+        throw new Error(errJson.error);
+      }
+    }
+  } catch (err) {
+    if (err.message && !err.message.includes('fetch') && !err.message.includes('NetworkError') && !err.message.includes('404')) {
+      throw err;
+    }
+  }
+
+  // STEP 2: Direct Google Gemini API Call
+  if (!apiKey) {
+    throw new Error(
+      'Gemini API key is not configured. Please enter your API key in Settings > Google Gemini AI Engine.'
+    );
+  }
+
+  const prompt = `You are an elite AI clinical nutritionist and food computer vision specialist.
+Carefully examine the foods and beverages visible on this plate or in this photo.
+Identify every distinct item, estimate realistic portion sizes, approximate weight in grams, and calculate USDA-calibrated nutritional values (calories, protein, carbs, fat, fiber, sugar).
 
 You MUST respond strictly with a valid JSON object matching this schema without any extra markdown:
 {
@@ -306,24 +302,25 @@ You MUST respond strictly with a valid JSON object matching this schema without 
   "items": [
     {
       "name": "string (specific food item name)",
-      "portion": "string (e.g. 1 medium fillet, 1 cup, 100g)",
+      "portion": "string (e.g. 1 medium piece, 1 cup, 150g)",
       "weight_g": number,
       "calories": number,
       "protein": number,
       "carbs": number,
       "fat": number,
-      "fiber": number
+      "fiber": number,
+      "sugar": number
     }
   ],
   "total_calories": number,
   "total_protein": number,
   "total_carbs": number,
   "total_fat": number,
-  "total_fiber": number
+  "total_fiber": number,
+  "total_sugar": number
 }`;
 
-  const targetModel = model === 'auto' || !model ? PRIMARY_MODEL : model;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [
@@ -347,68 +344,138 @@ You MUST respond strictly with a valid JSON object matching this schema without 
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Photo AI Scan failed with HTTP ${response.status}: ${errorText.substring(0, 150)}`);
+    let errMsg = `Photo AI Scan failed (HTTP ${response.status})`;
+    try {
+      const parsedErr = JSON.parse(errorText);
+      if (parsedErr.error && parsedErr.error.message) {
+        errMsg = parsedErr.error.message;
+      }
+    } catch (e) {}
+    throw new Error(errMsg);
   }
 
   const data = await response.json();
   const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!rawText) {
-    throw new Error('Gemini vision model returned an empty analysis.');
+    throw new Error('Gemini Vision returned an empty analysis. Please take a clearer photo under good lighting.');
   }
 
   const cleanJson = repairJsonString(rawText);
-  const parsed = JSON.parse(cleanJson);
-
-  if (parsed.items && Array.isArray(parsed.items)) {
-    parsed.items = parsed.items.map((item, idx) => ({
-      id: `scan_${Date.now()}_${idx}`,
-      name: item.name || 'Recognized Item',
-      portion: item.portion || `${item.weight_g || 100}g`,
-      grams: Number(item.weight_g) || 100,
-      calories: Math.round(Number(item.calories) || 0),
-      protein: Math.round((Number(item.protein) || 0) * 10) / 10,
-      carbs: Math.round((Number(item.carbs) || 0) * 10) / 10,
-      fat: Math.round((Number(item.fat) || 0) * 10) / 10,
-      fiber: Math.round((Number(item.fiber) || 0) * 10) / 10,
-      sugar: Math.round((Number(item.sugar) || 0) * 10) / 10,
-      saturatedFat: Math.round((Number(item.saturatedFat) || 0) * 10) / 10,
-      icon: getFoodIcon(item.name)
-    }));
+  let parsed;
+  try {
+    parsed = JSON.parse(cleanJson);
+  } catch (e) {
+    throw new Error('Failed to parse image recognition output. Please try again.');
   }
 
-  parsed.source = 'gemini_vision';
-  parsed.modelUsed = targetModel;
-  return parsed;
+  return normalizeAiResponse(parsed, targetModel, 'gemini_vision_direct');
+}
+
+// Offline heuristic fallback parser ONLY for verified catalogued items
+export function parseMealOffline(text) {
+  const query = text.toLowerCase().trim();
+  const foundItems = [];
+  const phrases = query.split(/\band\b|\+|\band\/or\b|,|&/i).map(s => s.trim()).filter(Boolean);
+
+  for (const phrase of phrases) {
+    let multiplier = 1;
+    let cleanPhrase = phrase;
+
+    const countMatch = phrase.match(/^(\d+(?:\.\d+)?)\s*(?:slices?|pieces?|large|cups?|bowls?)?\s+(.*)/i);
+    const weightMatch = phrase.match(/^(\d+(?:\.\d+)?)\s*(?:g|grams)\s+(.*)/i);
+
+    if (weightMatch) {
+      multiplier = parseFloat(weightMatch[1]) / 100;
+      cleanPhrase = weightMatch[2].trim();
+    } else if (countMatch) {
+      multiplier = parseFloat(countMatch[1]);
+      cleanPhrase = countMatch[2].trim();
+    }
+
+    // Match against verified USDA database
+    const dbMatch = DEFAULT_FOOD_DATABASE.find(f =>
+      f.name.toLowerCase() === cleanPhrase ||
+      cleanPhrase.includes(f.name.toLowerCase()) ||
+      f.name.toLowerCase().includes(cleanPhrase)
+    );
+
+    if (dbMatch) {
+      const p100 = dbMatch.per100g || {};
+      const baseGrams = dbMatch.servingSize || 100;
+      const actualGrams = Math.round(baseGrams * multiplier);
+      const mult = actualGrams / 100;
+
+      foundItems.push({
+        id: 'off_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        name: dbMatch.name,
+        portion: `${actualGrams}g (${dbMatch.servingDesc || 'standard serving'})`,
+        grams: actualGrams,
+        calories: Math.round((p100.calories || 0) * mult),
+        protein: Math.round((p100.protein || 0) * mult * 10) / 10,
+        carbs: Math.round((p100.carbs || 0) * mult * 10) / 10,
+        fat: Math.round((p100.fat || 0) * mult * 10) / 10,
+        fiber: Math.round((p100.fiber || 0) * mult * 10) / 10,
+        sugar: Math.round((p100.sugar || 0) * mult * 10) / 10,
+        icon: dbMatch.icon || getFoodIcon(dbMatch.name)
+      });
+    }
+  }
+
+  if (foundItems.length > 0) {
+    let totCal = 0, totProt = 0, totCarb = 0, totFat = 0, totFib = 0, totSug = 0;
+    foundItems.forEach(i => {
+      totCal += i.calories;
+      totProt += i.protein;
+      totCarb += i.carbs;
+      totFat += i.fat;
+      totFib += i.fiber;
+      totSug += (i.sugar || 0);
+    });
+    return {
+      meal_name: text.length > 30 ? text.substring(0, 30) + '...' : text,
+      items: foundItems,
+      total_calories: Math.round(totCal),
+      total_protein: Math.round(totProt * 10) / 10,
+      total_carbs: Math.round(totCarb * 10) / 10,
+      total_fat: Math.round(totFat * 10) / 10,
+      total_fiber: Math.round(totFib * 10) / 10,
+      total_sugar: Math.round(totSug * 10) / 10,
+      source: 'offline_database_match'
+    };
+  }
+
+  return null;
 }
 
 // Icon helper
 export function getFoodIcon(name = '') {
-  const n = name.toLowerCase();
+  const n = (name || '').toLowerCase();
+  if (n.includes('biryani') || n.includes('pulao')) return '🍛';
   if (n.includes('egg')) return '🥚';
   if (n.includes('bread') || n.includes('toast')) return '🍞';
   if (n.includes('roti') || n.includes('chapati') || n.includes('naan')) return '🫓';
+  if (n.includes('roll') || n.includes('wrap') || n.includes('kathi')) return '🌯';
+  if (n.includes('nacho') || n.includes('chips') || n.includes('crisps') || n.includes('bingo')) return '🥨';
   if (n.includes('chicken') || n.includes('poultry')) return '🍗';
-  if (n.includes('beef') || n.includes('steak')) return '🥩';
-  if (n.includes('salmon') || n.includes('fish') || n.includes('tuna')) return '🐟';
-  if (n.includes('rice') || n.includes('biryani')) return '🍚';
+  if (n.includes('beef') || n.includes('steak') || n.includes('meat')) return '🥩';
+  if (n.includes('salmon') || n.includes('fish') || n.includes('tuna') || n.includes('prawn')) return '🐟';
+  if (n.includes('rice')) return '🍚';
   if (n.includes('salad') || n.includes('spinach') || n.includes('lettuce')) return '🥗';
   if (n.includes('apple')) return '🍎';
   if (n.includes('banana')) return '🍌';
   if (n.includes('berry') || n.includes('blueberry')) return '🫐';
-  if (n.includes('milk') || n.includes('yogurt')) return '🥛';
-  if (n.includes('cheese')) return '🧀';
-  if (n.includes('coffee')) return '☕';
-  if (n.includes('chilla') || n.includes('pancake')) return '🥞';
-  if (n.includes('magaz') || n.includes('curry')) return '🍲';
+  if (n.includes('milk') || n.includes('yogurt') || n.includes('curd') || n.includes('dahi')) return '🥛';
+  if (n.includes('cheese') || n.includes('paneer')) return '🧀';
+  if (n.includes('coffee') || n.includes('tea') || n.includes('chai')) return '☕';
+  if (n.includes('chilla') || n.includes('dosa') || n.includes('pancake')) return '🥞';
+  if (n.includes('samosa') || n.includes('pakora') || n.includes('snack')) return '🥟';
+  if (n.includes('dal') || n.includes('curry') || n.includes('sabzi')) return '🍲';
   return '🍽️';
 }
 
@@ -417,5 +484,7 @@ export default {
   analyzeFoodImage,
   parseMealOffline,
   repairJsonString,
-  cleanApiKey
+  cleanApiKey,
+  buildTextMealPrompt,
+  getFoodIcon
 };

@@ -382,7 +382,10 @@ export default function App() {
           <DiaryScreen
             appState={appState}
             selectedDate={diaryDate}
-            onSelectDate={setDiaryDate}
+            onSelectDate={(newDate) => {
+              setDiaryDate(newDate);
+              setTargetLoggingDate(newDate);
+            }}
             onOpenScanForMeal={(m, d) => handleOpenScan(m, d || diaryDate)}
             onOpenQuickLogForMeal={(m, d) => handleOpenQuickLog(m, d || diaryDate)}
             onOpenFoodDbForMeal={(m, d) => handleOpenFoodDb(m, d || diaryDate)}

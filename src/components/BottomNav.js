@@ -2,7 +2,7 @@
 // Pure white background, clean vector icons, and an elevated solid black camera scan trigger.
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { HomeIcon, DiaryIcon, CameraIcon, InsightsIcon, ProfileIcon } from './Icons';
 
@@ -131,43 +131,46 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 84,
+    minHeight: 80,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#EAEAEA',
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingBottom: 20,
-    paddingHorizontal: 8
+    paddingTop: 6,
+    paddingBottom: Platform.OS === 'web' ? 'max(20px, calc(env(safe-area-inset-bottom, 20px) + 4px))' : 24,
+    paddingHorizontal: 8,
+    zIndex: 100
   },
   tabItem: {
     flex: 1,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 6
+    paddingTop: 4
   },
   tabLabel: {
     fontSize: 10,
-    marginTop: 4,
+    marginTop: 3,
     letterSpacing: 0.2
   },
   centerScanHolder: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -20
+    marginTop: -22
   },
   scanButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: '#111111',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6
   }

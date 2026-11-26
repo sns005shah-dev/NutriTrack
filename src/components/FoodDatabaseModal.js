@@ -1,7 +1,7 @@
 // Cal AI Minimalist USDA Food Database Modal
 // 1,700+ verified foods with category pills, instant search, serving configuration, and solid black save button.
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -9,7 +9,8 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  StyleSheet
+  StyleSheet,
+  Platform
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
@@ -43,6 +44,12 @@ export default function FoodDatabaseModal({
   const [selectedFood, setSelectedFood] = useState(null);
   const [selectedServingIdx, setSelectedServingIdx] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (defaultMealType) {
+      setSelectedMealType(defaultMealType);
+    }
+  }, [defaultMealType, visible]);
 
   const mealTypes = [
     { key: 'breakfast', label: 'Breakfast', icon: '🍳' },
@@ -127,13 +134,22 @@ export default function FoodDatabaseModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.headerBar}>
-          <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <CrossIcon size={20} color="#111111" />
-          </TouchableOpacity>
-          <Text style={styles.screenTitle}>Search Foods</Text>
-          <View style={{ width: 24 }} />
+        {/* Header with Safe Area Inset */}
+        <View style={styles.modalHeaderWrapper}>
+          <View style={styles.headerBar}>
+            <TouchableOpacity
+              onPress={handleClose}
+              style={styles.closeBtn}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Close Food Search"
+            >
+              <CrossIcon size={20} color="#111111" strokeWidth={2.4} />
+            </TouchableOpacity>
+            <Text style={styles.screenTitle}>Search Foods</Text>
+            <View style={styles.headerRightSpacer} />
+          </View>
         </View>
 
         <View style={styles.contentWrap}>
@@ -330,22 +346,36 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF'
   },
+  modalHeaderWrapper: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EAEAEA',
+    paddingTop: Platform.OS === 'web' ? 'max(14px, env(safe-area-inset-top, 16px))' : 14,
+    paddingHorizontal: 16
+  },
   headerBar: {
+    height: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EAEAEA'
+    justifyContent: 'space-between'
   },
   closeBtn: {
-    padding: 6
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   screenTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#111111'
+    color: '#111111',
+    textAlign: 'center'
+  },
+  headerRightSpacer: {
+    width: 44,
+    height: 44
   },
   contentWrap: {
     flex: 1,

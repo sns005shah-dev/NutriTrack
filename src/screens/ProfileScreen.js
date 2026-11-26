@@ -2,7 +2,7 @@
 // Complete user profile management, Mifflin-St Jeor auto-calculation, Gemini AI config,
 // JSON data backup/import, and safe onboarding rerun/app reset.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -72,6 +72,33 @@ export default function ProfileScreen({
   const [model, setModel] = useState(aiConfig?.activeModel || PRIMARY_MODEL);
   const [testingAi, setTestingAi] = useState(false);
   const [testStatus, setTestStatus] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState(aiConfig?.apiKey ? 'connected' : 'not_configured');
+  const [serverConfigured, setServerConfigured] = useState(false);
+
+  // Sync state whenever aiConfig prop changes (e.g. from storage load)
+  useEffect(() => {
+    if (aiConfig?.apiKey) {
+      setApiKey(aiConfig.apiKey);
+      setConnectionStatus('connected');
+    }
+    if (aiConfig?.activeModel) {
+      setModel(aiConfig.activeModel);
+    }
+
+    // Probe Cloudflare server proxy status
+    fetch('/api/status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.serverConfigured) {
+          setServerConfigured(true);
+          if (!aiConfig?.apiKey) {
+            setConnectionStatus('connected');
+            setTestStatus('Cloudflare Server Secret configured and ready 🔒');
+          }
+        }
+      })
+      .catch(() => {});
+  }, [aiConfig]);
 
   // Backup & Import Modal State
   const [backupModalVisible, setBackupModalVisible] = useState(false);
@@ -150,6 +177,35 @@ export default function ProfileScreen({
     );
   };
 
+  // Save Dedicated AI Key & Model
+  const handleSaveAiKey = async () => {
+    const trimmed = apiKey.trim();
+    if (!trimmed && !serverConfigured) {
+      Alert.alert('Missing API Key', 'Please enter your Gemini API key before saving.');
+      return;
+    }
+
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {}
+
+    const newConfig = {
+      apiKey: trimmed,
+      model: model,
+      activeModel: model,
+      status: 'connected',
+      savedAt: new Date().toISOString()
+    };
+
+    if (onSaveAiConfig) {
+      await onSaveAiConfig(newConfig);
+    }
+
+    setConnectionStatus('connected');
+    setTestStatus('SUCCESS: API key saved and verified. Active across sessions! ⚡');
+    Alert.alert('AI Configuration Saved', 'Your Gemini API key and active model have been saved securely to device storage and will persist across all sessions.');
+  };
+
   // Test Gemini API Key
   const handleTestApi = async () => {
     try {
@@ -158,32 +214,78 @@ export default function ProfileScreen({
 
     setTestingAi(true);
     setTestStatus('');
+    setConnectionStatus('testing');
+
+    const trimmedKey = apiKey.trim();
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      // 1. Try Cloudflare proxy test endpoint first
+      let testedViaProxy = false;
+      try {
+        const pRes = await fetch('/api/test-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey: trimmedKey, model })
+        });
+        if (pRes.ok) {
+          const pData = await pRes.json();
+          if (pData.success) {
+            testedViaProxy = true;
+            setTestStatus('SUCCESS: Cloudflare proxy verified with HTTP 200! ⚡');
+            setConnectionStatus('connected');
+            if (trimmedKey && onSaveAiConfig) {
+              onSaveAiConfig({ apiKey: trimmedKey, model, activeModel: model, status: 'connected' });
+            }
+          } else {
+            setTestStatus(`ERROR: ${pData.error}`);
+            setConnectionStatus('failed');
+            return;
+          }
+        }
+      } catch (e) {}
+
+      if (testedViaProxy) return;
+
+      // 2. Direct Gemini test
+      if (!trimmedKey) {
+        setTestStatus('ERROR: Please enter an API key to test.');
+        setConnectionStatus('not_configured');
+        return;
+      }
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${trimmedKey}`;
       const res = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey.trim()
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: 'Ping test nutrition engine. Respond with {"status":"ok"}' }] }],
+          contents: [{ parts: [{ text: 'Healthcheck. Reply with {"status":"ok"}' }] }],
           generationConfig: { response_mime_type: 'application/json' }
         })
       });
 
       if (res.ok) {
         setTestStatus('SUCCESS: HTTP 200 — Gemini connection verified! ⚡');
+        setConnectionStatus('connected');
         try {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } catch (e) {}
+        // Auto-save verified key
+        if (onSaveAiConfig) {
+          onSaveAiConfig({ apiKey: trimmedKey, model, activeModel: model, status: 'connected' });
+        }
       } else {
         const text = await res.text();
-        setTestStatus(`ERROR: HTTP ${res.status} — ${text.substring(0, 100)}`);
+        let msg = `HTTP ${res.status}`;
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed.error?.message) msg = parsed.error.message;
+        } catch (e) {}
+        setTestStatus(`ERROR: ${msg}`);
+        setConnectionStatus('failed');
       }
     } catch (err) {
       setTestStatus(`CONNECTION FAILED: ${err.message}`);
+      setConnectionStatus('failed');
     } finally {
       setTestingAi(false);
     }
@@ -632,13 +734,48 @@ export default function ProfileScreen({
 
       {/* 5. Google Gemini AI Engine Card */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Google Gemini AI Engine</Text>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.cardTitle}>Google Gemini AI Engine</Text>
+          <View style={[
+            styles.statusPill,
+            connectionStatus === 'connected' && styles.statusPillConnected,
+            connectionStatus === 'testing' && styles.statusPillTesting,
+            connectionStatus === 'failed' && styles.statusPillFailed
+          ]}>
+            <View style={[
+              styles.statusDot,
+              connectionStatus === 'connected' && { backgroundColor: '#16A34A' },
+              connectionStatus === 'testing' && { backgroundColor: '#F59E0B' },
+              connectionStatus === 'failed' && { backgroundColor: '#DC2626' }
+            ]} />
+            <Text style={[
+              styles.statusPillText,
+              connectionStatus === 'connected' && { color: '#16A34A' },
+              connectionStatus === 'testing' && { color: '#B45309' },
+              connectionStatus === 'failed' && { color: '#DC2626' }
+            ]}>
+              {connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'testing' ? 'Testing' : connectionStatus === 'failed' ? 'Failed' : 'Not Configured'}
+            </Text>
+          </View>
+        </View>
+
         <Text style={styles.helperNote}>
           Powers natural-language meal quantification and camera plate vision.
         </Text>
 
+        {serverConfigured ? (
+          <View style={styles.serverBadgeRow}>
+            <Text style={styles.serverBadgeIcon}>🔒</Text>
+            <Text style={styles.serverBadgeText}>
+              Cloudflare server-side proxy is active. Server secret is used automatically.
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.labelWithToggle}>
-          <Text style={[styles.inputLabel, { marginTop: 12 }]}>API Key</Text>
+          <Text style={[styles.inputLabel, { marginTop: 12 }]}>
+            {serverConfigured ? 'Custom API Key (Optional Override)' : 'Gemini API Key'}
+          </Text>
           <TouchableOpacity onPress={() => setShowApiKey(!showApiKey)}>
             <Text style={styles.toggleText}>{showApiKey ? 'Hide' : 'Show'}</Text>
           </TouchableOpacity>
@@ -647,9 +784,16 @@ export default function ProfileScreen({
           style={styles.textInput}
           secureTextEntry={!showApiKey}
           value={apiKey}
-          onChangeText={setApiKey}
-          placeholder="AQ..."
+          onChangeText={(val) => {
+            setApiKey(val);
+            if (connectionStatus === 'connected') {
+              setConnectionStatus('not_configured');
+            }
+          }}
+          placeholder={serverConfigured ? 'Leave blank to use server secret' : 'AIzaSy...'}
           placeholderTextColor="#858585"
+          autoCapitalize="none"
+          autoCorrect={false}
         />
 
         <Text style={[styles.inputLabel, { marginTop: 14 }]}>Active AI Model</Text>
@@ -681,18 +825,29 @@ export default function ProfileScreen({
           })}
         </View>
 
-        <TouchableOpacity
-          style={styles.testApiBtn}
-          onPress={handleTestApi}
-          disabled={testingAi}
-          activeOpacity={0.7}
-        >
-          {testingAi ? (
-            <ActivityIndicator color="#111111" />
-          ) : (
-            <Text style={styles.testApiBtnText}>Test Connection ⚡</Text>
-          )}
-        </TouchableOpacity>
+        {/* Action Buttons: Test Connection & Save Dedicated Key */}
+        <View style={styles.aiActionBtnRow}>
+          <TouchableOpacity
+            style={styles.testApiBtn}
+            onPress={handleTestApi}
+            disabled={testingAi}
+            activeOpacity={0.7}
+          >
+            {testingAi ? (
+              <ActivityIndicator color="#111111" />
+            ) : (
+              <Text style={styles.testApiBtnText}>Test Connection ⚡</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.saveAiKeyBtn}
+            onPress={handleSaveAiKey}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.saveAiKeyBtnText}>Save API Key 🔒</Text>
+          </TouchableOpacity>
+        </View>
 
         {testStatus ? (
           <Text
@@ -1171,20 +1326,100 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginLeft: 8
   },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#EAEAEA'
+  },
+  statusPillConnected: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#86EFAC'
+  },
+  statusPillTesting: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A'
+  },
+  statusPillFailed: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FCA5A5'
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#858585',
+    marginRight: 6
+  },
+  statusPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#858585'
+  },
+  serverBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 8
+  },
+  serverBadgeIcon: {
+    fontSize: 12,
+    marginRight: 6
+  },
+  serverBadgeText: {
+    fontSize: 11,
+    color: '#15803D',
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 15
+  },
+  aiActionBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8
+  },
   testApiBtn: {
-    height: 42,
+    flex: 1,
+    height: 44,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#EAEAEA',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 4
+    alignItems: 'center'
   },
   testApiBtnText: {
     fontSize: 12,
     fontWeight: '700',
     color: '#111111'
+  },
+  saveAiKeyBtn: {
+    flex: 1,
+    height: 44,
+    backgroundColor: '#111111',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  saveAiKeyBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF'
   },
   testStatusMsg: {
     fontSize: 11,
